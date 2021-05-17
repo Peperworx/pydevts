@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "pydds"
+version = "0.0.1"
+description = "PYDDS (PYthon Distributed Data Store) Is a distributed data store and message service based ont he concept of nodes and built with python."
+authors = ["Riley Wilton <meetingprince34@outlook.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
