@@ -28,7 +28,8 @@ class Node(metaclass=AsyncCustomInitMeta):
         self.conn = p2p.P2PConnection(host, port)
 
         self.events = {
-            "on_startup":self.on_startup
+            "on_startup":self.on_startup,
+            "test":self.test
         }
 
         # Register the events
@@ -45,6 +46,9 @@ class Node(metaclass=AsyncCustomInitMeta):
             Internal startup function
         """
 
-        # Request keys from cluster
-        self.conn.send(0,"request_keys")
-        
+        print("Startup!")
+        print(self.conn.peers)
+        await self.conn.broadcast("test","")
+    
+    async def test(self, data):
+        print("received test")

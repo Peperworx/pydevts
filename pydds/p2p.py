@@ -87,7 +87,51 @@ class P2PConnection:
             "host_port": self.server.socket.getsockname()[1]
         })
 
+        # Receive details
+        data = await self._recv(conn)
 
+        if data["type"] == "prepare_accept":
+            logging.debug(f"We have been accepted")
+            self.nid = data["nid"]
+        
+
+
+        
+
+    async def broadcast(self, name: str, data: dict):
+        """
+            Broadcast event {name} with data {data} to all peers.
+        """
+        for peer in self.peers:
+            
+            conn = await trio.open_tcp_stream(
+                host = peer["host"],
+                port = peer["port"]
+            )
+            await self._send(conn, {
+                "type":"message",
+                "name":name,
+                "data":data,
+                "port":self.server.socket.getsockname()[1]
+            })
+            await conn.aclose()
+
+    async def sendto(self, peer: str, name: str, data: dict):
+        """
+            Send event to peer with ID {peer}
+        """
+        for peer in self.peers:
+            if peer["id"] == peer:
+                conn = await trio.open_tcp_stream(
+                    host = peer["host"],
+                    port = peer["port"]
+                )
+                await self._send(conn, {
+                    "type":"message",
+                    "name":name,
+                    "data":data
+                })
+                await conn.aclose()
     
     async def start(self):
         """
@@ -103,7 +147,7 @@ class P2PConnection:
             await self._client_init()
         except OSError or UnableToConnect:
             # If we are the only instance, we generate out own node id
-            self.nid = uuid.uuid4()
+            self.nid = str(uuid.uuid4())
             logging.info(f"Unable to connect to remote {self.target_address}:{self.target_port}")
 
         host = self.server.socket.getsockname()[0]
@@ -111,9 +155,19 @@ class P2PConnection:
 
         logging.info(f"Hosting TCP server at address {host}:{port}")
         
-        await trio.serve_listeners(self._serve, [self.server])
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(trio.serve_listeners,self._serve, [self.server])
+            nursery.start_soon(self._finish_startup)
 
-    
+    async def _finish_startup(self):
+        """
+            Finish startup
+        """
+        await trio.sleep(0.2)
+
+
+        [await m() for m in self.messages["on_startup"]]
+
     async def _send(self, conn: trio.SocketStream, data: dict):
         """
             Sends data over a socket stream
@@ -187,6 +241,18 @@ class P2PConnection:
             elif data["type"] == "new_node":
                 logging.debug(f"Client {host}:{data['port']} is joining the cluster")
                 await self._peer_joined(ss, host, port, data)
+            elif data["type"] == "message":
+                logging.debug(f"Client {host}:{data['port']} has sent message {data['name']}")
+                if data["name"] in self.messages:
+                    [await m(data["data"]) for m in self.messages[data["name"]]]
+            elif data["type"] == "peer_ready":
+                self.peers.append({
+                    "id":data["id"],
+                    "host":host,
+                    "port":data["port"],
+                    "client_port":port
+                })
+            
     async def _server_joined(self, ss, host, port, data):
         """
             Called when a peer requests to join
@@ -215,6 +281,20 @@ class P2PConnection:
             "client_port":port
         })
 
+        shost = self.server.socket.getsockname()[0]
+        sport = self.server.socket.getsockname()[1]
+        conn = await trio.open_tcp_stream(
+            host = host,
+            port = data["host_port"]
+        )
+        await self._send(conn, {
+            "type":"peer_ready",
+            "id":self.nid,
+            "host":shost,
+            "port":sport
+        })
+        await conn.aclose()
+
         # Re verify peer list
         await self._verify_peers()
 
@@ -242,6 +322,28 @@ class P2PConnection:
         """
         
         print("Peer Joined Network on external node")
+
+        self.peers.append({
+            "id":data["id"],
+            "host":data["host"],
+            "port":data["port"],
+            "client_port":data["client_port"]
+        })
+
+        host = self.server.socket.getsockname()[0]
+        port = self.server.socket.getsockname()[1]
+
+        conn = await trio.open_tcp_stream(
+            host = data["host"],
+            port = data["port"]
+        )
+        await self._send(conn, {
+            "type":"peer_ready",
+            "id":self.nid,
+            "host": host,
+            "port": port
+        })
+        await conn.aclose()
     
 
     async def _verify_peers(self):
