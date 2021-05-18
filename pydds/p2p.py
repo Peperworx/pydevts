@@ -6,6 +6,7 @@ import trio
 
 import logging
 import struct
+import sys
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -100,9 +101,32 @@ class P2PConnection:
             
             # Add the initial client
             self.peers.append((self.target_address,self.target_port,))
-        print(self.peers)
-        # Serve the listeners
-        await trio.serve_listeners(self._serve,[self.server])
+        
+        async with trio.open_nursery() as nursery:
+            # Serve the listeners
+            nursery.start_soon(trio.serve_listeners,self._serve,[self.server])
+            nursery.start_soon(self.console)
+
+    async def console(self):
+        """
+            Interactive message console
+        """
+        stdin = trio.wrap_file(sys.stdin)
+        while True:
+            r = (await stdin.readline())[:-1]
+            if r == "quit":
+                return
+            await self.send(0,r,b"")
+            
+    async def send(self, typ: int, name: str, data: bytes):
+        """
+            Send a standard message
+        """
+
+        if typ == 0:
+            for peer in self.peers:
+                conn = await trio.open_tcp_stream(peer[0],peer[1])
+                await self._send(conn,0,name,data)
 
     async def _send(self, stream: trio.SocketStream, msg_type: int, name: str, data: bytes):
         """
@@ -205,7 +229,7 @@ class P2PConnection:
         offset = struct.calcsize("LL")
         chost = data[offset:offset+header[0]].decode()
 
-        if (host, port,) in self.peers:
+        if (host, port,) not in self.peers:
             self.peers.append((chost,cport,))
         
         logging.info(f"Peer {chost}:{cport} joined network")
