@@ -112,9 +112,15 @@ class P2PConnection:
         """
 
         if typ == 0:
+            rmp = []
             for peer in self.peers:
-                conn = await trio.open_tcp_stream(peer[0],peer[1])
-                await self._send(conn,0,name,data)
+                try:
+                    conn = await trio.open_tcp_stream(peer[0],peer[1])
+                    await self._send(conn,0,name,data)
+                except OSError:
+                    logging.info(f"Peer {peer[0]}:{peer[1]} was not found. Removing")
+                    rmp += [peer]
+            [self.peers.remove(p) for p in rmp]
 
     async def _send(self, stream: trio.SocketStream, msg_type: int, name: str, data: bytes):
         """
@@ -194,18 +200,23 @@ class P2PConnection:
 
         # Send peers list
         await ss.send_all(senddata)
-
+        rmp = []
         for peer in self.peers:
-            conn = await trio.open_tcp_stream(peer[0],peer[1])
-            await self._send(conn,1,"peer_joined",
-                struct.pack("LL",
-                    len(host),
-                    cport
-                ) + host.encode()
-            )
-        
+            try:
+                conn = await trio.open_tcp_stream(peer[0],peer[1])
+                await self._send(conn,1,"peer_joined",
+                    struct.pack("LL",
+                        len(host),
+                        cport
+                    ) + host.encode()
+                )
+            except OSError:
+                logging.info(f"Peer {peer[0]}:{peer[1]} was not found. Removing")
+                rmp += [peer]
+        [self.peers.remove(p) for p in rmp]
         # Add to peers
-        self.peers.append((host,cport,))
+        if (host, cport,) not in self.peers:
+            self.peers.append((host,cport,))
         
     async def _peer_joined(self, ss, host, port, data):
         """

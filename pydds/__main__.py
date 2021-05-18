@@ -13,5 +13,6 @@ async def test(ss,data):
 @p2p.listen("on_startup")
 async def start(c):
     print("Connection Ready")
+    await c.send(0,"test",b"woohoo")
 
 trio.run(p2p.start)
