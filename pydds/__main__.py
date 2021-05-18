@@ -1,18 +1,12 @@
-from .p2p import *
+from .node import *
 import trio
 import sys
 import threading
+import struct
 
-p2p = P2PConnection("localhost",int(sys.argv[1]))
+async def main():
+    n = await Node("localhost",sys.argv[1])
 
-@p2p.listen("test")
-async def test(ss,data):
-    print("message test was recieved!")
-    print(data)
+    await n.run()
 
-@p2p.listen("on_startup")
-async def start(c):
-    print("Connection Ready")
-    await c.send(0,"test",b"woohoo")
-
-trio.run(p2p.start)
+trio.run(main)

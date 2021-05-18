@@ -21,7 +21,9 @@ class P2PConnection:
         self.target_port = target_port
 
 
-        self.messages = {}
+        self.messages = {
+            "on_startup":[]
+        }
 
         self.peers = []
 
@@ -52,11 +54,11 @@ class P2PConnection:
         
         # Create a client object
         try:
-            init_peer = await trio.open_tcp_stream(self.target_address,self.target_port)
+            self.init_peer = await trio.open_tcp_stream(self.target_address,self.target_port)
             logging.info(f"Connected to peer {self.target_address}:{self.target_port}")
         except socket.gaierror or OSError:
             logging.warning(f"Unable to connect to peer {self.target_address}:{self.target_port}. Still awaiting connections")
-            init_peer = None
+            self.init_peer = None
         
         
         # Create server object
@@ -70,16 +72,16 @@ class P2PConnection:
         if init_peer:
             # Request server information from them
             await self._send(
-                init_peer, 1, "server_join",
+                self.init_peer, 1, "server_join",
                 struct.pack("LL",
                     len(self.server.socket.getsockname()[0]),
                     self.server.socket.getsockname()[1]
                 ) + self.server.socket.getsockname()[0].encode()
             )
-            returns = struct.unpack("L",(await init_peer.receive_some(struct.calcsize("L"))))[0]
+            returns = struct.unpack("L",(await self.init_peer.receive_some(struct.calcsize("L"))))[0]
             data = b""
             if returns > 0:
-                data = await init_peer.receive_some(returns)
+                data = await self.init_peer.receive_some(returns)
             
             # Populate list of peers
             offset = 0
@@ -102,7 +104,7 @@ class P2PConnection:
         
         
         # Call own ready event
-        [await m(self) for m in self.messages["on_startup"]]
+        [await m() for m in self.messages["on_startup"]]
 
         await trio.serve_listeners(self._serve,[self.server])
             
@@ -159,7 +161,7 @@ class P2PConnection:
             logging.debug(f"Recieved event '{name}'")
 
             if name in self.messages.keys():
-                [await m(server_stream, data) for m in self.messages[name]]
+                [await m(data) for m in self.messages[name]]
         elif header[0] == 1: # If it is a system message
             # Log it
             logging.debug(f"Recieved system event '{name}'")
