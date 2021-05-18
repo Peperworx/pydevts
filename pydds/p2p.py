@@ -88,10 +88,9 @@ class P2PConnection:
 
         # Receive details
         data = await self._recv(conn)
-
         if data["type"] == "prepare_accept":
             logging.debug(f"We have been accepted")
-            self.nid = data["nid"]
+            self.nid = data["id"]
         
 
 
@@ -116,12 +115,15 @@ class P2PConnection:
             })
             await conn.aclose()
 
-    async def sendto(self, peer: str, name: str, data: dict):
+    async def sendto(self, peerid: str, name: str, data: dict):
         """
             Send event to peer with ID {peer}
         """
+        
         for peer in self.peers:
-            if peer["id"] == peer:
+            
+            if peer["id"] == peerid:
+                
                 conn = await trio.open_tcp_stream(
                     host = peer["host"],
                     port = peer["port"]
@@ -146,10 +148,11 @@ class P2PConnection:
 
         # Attempt to initialize client
         try:
-            await self._client_init()
-        except OSError or UnableToConnect:
             # If we are the only instance, we generate out own node id
             self.nid = str(uuid.uuid4())
+            await self._client_init()
+        except OSError or UnableToConnect:
+            
             logging.info(f"Unable to connect to remote {self.target_address}:{self.target_port}")
 
         host = self.server.socket.getsockname()[0]
@@ -263,12 +266,12 @@ class P2PConnection:
         # TODO: Credentials here
 
         # Generate a Node ID
-        nid = str(uuid.uuid4())
-
+        pid = str(uuid.uuid4())
+        
         # Create peer request
         peer_request = {
             "type":"new_node",
-            "id":nid,
+            "id":pid,
             "host":host,
             "port":data["host_port"],
             "client_port":port
@@ -277,7 +280,7 @@ class P2PConnection:
         # Tell client to prepare for acceptance
         await self._send(ss,{
             "type":"prepare_accept",
-            "id":nid,
+            "id":pid,
             "host":host,
             "port":data["host_port"],
             "client_port":port
@@ -311,7 +314,7 @@ class P2PConnection:
         
         # Add to peers
         self.peers += [{
-            "id":nid,
+            "id":pid,
             "host":host,
             "port":data["host_port"],
             "client_port":port
