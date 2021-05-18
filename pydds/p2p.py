@@ -110,9 +110,10 @@ class P2PConnection:
             )
             await self._send(conn, {
                 "type":"message",
+                "from":self.nid,
+                "port":self.server.socket.getsockname()[1],
                 "name":name,
                 "data":data,
-                "port":self.server.socket.getsockname()[1]
             })
             await conn.aclose()
 
@@ -128,6 +129,8 @@ class P2PConnection:
                 )
                 await self._send(conn, {
                     "type":"message",
+                    "from":self.nid,
+                    "port":self.server.socket.getsockname()[1],
                     "name":name,
                     "data":data
                 })
