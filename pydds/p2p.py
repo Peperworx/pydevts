@@ -163,6 +163,9 @@ class P2PConnection:
         if header[0] == 0: # If it is a message type of zero
             # Log it
             logging.debug(f"Recieved event '{name}'")
+
+            if name in self.messages.keys():
+                [await m(server_stream, data) for m in self.messages[name]]
         elif header[0] == 1: # If it is a system message
             # Log it
             logging.debug(f"Recieved system event '{name}'")
