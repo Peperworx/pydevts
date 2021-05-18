@@ -3,7 +3,10 @@ from pydds.node import *
 from fastapi import FastAPI
 from hypercorn.trio import serve
 from hypercorn.config import Config
+import logging
 import sys
+
+logging.basicConfig(level=logging.DEBUG)
 
 n = DBNode('localhost', sys.argv[1])
 
