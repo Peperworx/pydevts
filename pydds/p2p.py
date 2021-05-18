@@ -152,7 +152,16 @@ class P2PConnection:
             Called when a peer requests to join
         """
 
-        logging.info(f"Peer {host}:{port} joined network")
+        offset = struct.calcsize("LL")
+        header = struct.unpack("LL",data[:offset])
+        
+        # Grab port
+        cport = header[1]
+
+        # Grab hostname
+        chost = data[offset:offset+header[0]].decode()
+
+        logging.info(f"Peer {host}:{cport} joined network")
         
         
         
@@ -176,16 +185,27 @@ class P2PConnection:
             await self._send(conn,1,"peer_joined",
                 struct.pack("LL",
                     len(host),
-                    port
+                    cport
                 ) + host.encode()
             )
         
         # Add to peers
-        self.peers.append((host,port,))
+        self.peers.append((host,cport,))
         
     async def _peer_joined(self, ss, host, port, data):
         """
             Called when a peer joins
         """
-        print("Peer Joined")
-        print(data)
+        
+        # Unpack peer data
+        header = struct.unpack("LL",data[:struct.calcsize("LL")])
+
+        cport = header[1]
+
+        offset = struct.calcsize("LL")
+        chost = data[offset:offset+header[0]].decode()
+
+        if (host, port,) in self.peers:
+            self.peers.append((chost,cport,))
+        
+        logging.info(f"Peer {chost}:{cport} joined network")
