@@ -8,6 +8,7 @@ import logging
 import struct
 import sys
 import json
+import uuid
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -75,21 +76,35 @@ class P2PConnection:
         # Make sure that we got a status ping back
         if status['type'] != 'status':
             raise UnableToConnect()
+
+        logging.debug(f"Server {host}:{port} has responded to status check.")
         
-        
+
+        # TODO: Credentials Here
+        await self._send(conn, {
+            "type":"register",
+            "as":"node",
+            "host_port": self.server.socket.getsockname()[1]
+        })
+
+
     
     async def start(self):
         """
             Starts the server
         """
 
+        
+        # Create a server
+        self.server = (await trio.open_tcp_listeners(host="0.0.0.0",port=0))[0]
+
         # Attempt to initialize client
         try:
             await self._client_init()
         except OSError or UnableToConnect:
+            # If we are the only instance, we generate out own node id
+            self.nid = uuid.uuid4()
             logging.info(f"Unable to connect to remote {self.target_address}:{self.target_port}")
-        
-        self.server = (await trio.open_tcp_listeners(host="0.0.0.0",port=0))[0]
 
         host = self.server.socket.getsockname()[0]
         port = self.server.socket.getsockname()[1]
@@ -124,17 +139,29 @@ class P2PConnection:
         # Pack and return data
         return struct.pack("L",data_len)+data
     
+    async def _unpack(self, data: bytes) -> dict:
+        """
+            Unpacks data
+        """
+        offset = struct.calcsize("L")
+        size = struct.unpack("L",data[:offset])[0]
+        data = data[offset:offset+size].decode()
+        return json.loads(data)
+
     async def _recv(self, ss) -> dict:
         """
             Receives data from a connection.
         """
         offset = struct.calcsize("L")
-        size = struct.unpack("L",await ss.receive_some(offset))[0]
+        recsize = await ss.receive_some(offset)
+        if len(recsize) < offset:
+            return {}
+        size = struct.unpack("L",recsize)[0]
         data = (await ss.receive_some(size)).decode()
         data = json.loads(data)
         return data
 
-    async def _serve(self, ss):
+    async def _serve(self, ss: trio.SocketStream):
         """
             Internal function for serving requests.
             This function handles a single request over the stream {ss}
@@ -142,22 +169,72 @@ class P2PConnection:
 
 
         
-        logging.debug(f"Message from {ss.socket.getpeername()[0]}:{ss.socket.getpeername()[1]}")
+        async for data in ss:
+            data = await self._unpack(data)
+            # Log connection
+            host = ss.socket.getpeername()[0]
+            port = ss.socket.getpeername()[1]
+            logging.debug(f"Message from {host}:{port}")
+            
 
-        # Unpack the data
-        data = await self._recv(ss)
-
-        if data["type"] == "status":
-            await self._send(ss,{
-                "type":"status"
-            })
-
+            if data["type"] == "status":
+                await self._send(ss,{
+                    "type":"status"
+                })
+            elif data["type"] == "register":
+                logging.debug(f"Client {host}:{data['host_port']} is requesting to join cluster")
+                await self._server_joined(ss, host, port, data)
+            elif data["type"] == "new_node":
+                logging.debug(f"Client {host}:{data['port']} is joining the cluster")
+                await self._peer_joined(ss, host, port, data)
     async def _server_joined(self, ss, host, port, data):
         """
             Called when a peer requests to join
         """
 
-        print("Peer joining network on this node")
+        # TODO: Credentials here
+
+        # Generate a Node ID
+        nid = str(uuid.uuid4())
+
+        # Create peer request
+        peer_request = {
+            "type":"new_node",
+            "id":nid,
+            "host":host,
+            "port":data["host_port"],
+            "client_port":port
+        }
+
+        # Tell client to prepare for acceptance
+        await self._send(ss,{
+            "type":"prepare_accept",
+            "id":nid,
+            "host":host,
+            "port":data["host_port"],
+            "client_port":port
+        })
+
+        # Re verify peer list
+        await self._verify_peers()
+
+        # Send to each peer
+        for peer in self.peers:
+            conn = await trio.open_tcp_stream(
+                host=peer["host"],
+                port=peer["port"]
+            )
+            await self._send(conn,peer_request)
+            await conn.aclose()
+        
+        # Add to peers
+        self.peers += [{
+            "id":nid,
+            "host":host,
+            "port":data["host_port"],
+            "client_port":port
+        }]
+
         
     async def _peer_joined(self, ss, host, port, data):
         """
@@ -165,3 +242,27 @@ class P2PConnection:
         """
         
         print("Peer Joined Network on external node")
+    
+
+    async def _verify_peers(self):
+        """
+            Verifies each peer, checking it it exists, removing it if it does not
+        """
+        
+        rmp = []
+        for peer in self.peers:
+            try:
+                conn = await trio.open_tcp_stream(
+                    host=peer["host"],
+                    port=peer["port"]
+                )
+                await self._send(conn, {
+                    "type":"status"
+                })
+                recv = await self._recv(conn)
+                if recv["type"] != "status":
+                    rmp += [peer]
+            except OSError:
+                rmp += [peer]
+        
+        [self.peers.remove(p) for p in rmp if p in self.peers]
