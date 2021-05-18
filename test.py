@@ -12,9 +12,10 @@ app = FastAPI()
 @app.get("/")
 async def index():
     await n.emit("test_event","hello, world!")
+    
 
 @n.on("test_event")
-async def test_event(data):
+async def test_event(request, data):
     print(data)
     
 

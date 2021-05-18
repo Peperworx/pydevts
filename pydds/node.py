@@ -63,6 +63,34 @@ class Node(metaclass=AsyncCustomInitMeta):
 
         await self.conn._emit(conn, f"_{event}", data)
 
+        # Return the open connection
+        return conn
+
+    async def on_enter(self):
+        """
+            Function called when the node successfully connects to the cluster
+        """
+
+    ##############################
+    #      Data Replication
+    ##############################
+
+    async def on_replicate(self, request, data: dict):
+        """
+            Function called when data needs to be replicated
+        """
+        ...
+    
+
+
+    async def on_fetch(self, request, data: dict):
+        """
+            Function called when a node needs to read a value from other nodes.
+        """
+        ...
+    
+    
+    
 
 class DBNode(Node):
     """

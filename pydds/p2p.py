@@ -261,7 +261,7 @@ class P2PConnection:
             elif data["type"] == "message":
                 logging.debug(f"Client {host}:{data['port']} has sent message {data['name']}")
                 if data["name"] in self.messages:
-                    [await m(data["data"]) for m in self.messages[data["name"]]]
+                    [await m(ss,data["data"]) for m in self.messages[data["name"]]]
             elif data["type"] == "peer_ready":
                 self.peers.append({
                     "id":data["id"],
