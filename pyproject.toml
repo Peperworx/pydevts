@@ -6,6 +6,7 @@ authors = ["Riley Wilton <meetingprince34@outlook.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
+trio = "^0.18.0"
 
 [tool.poetry.dev-dependencies]
 

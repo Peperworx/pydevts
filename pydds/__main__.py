@@ -1,6 +1,6 @@
 from .p2p import *
 
+import sys
 
-
-p2p = P2PConnection("192.168.1.1",80)
+p2p = P2PConnection("localhost",int(sys.argv[1]))
 p2p.start()
