@@ -14,14 +14,19 @@ async def index():
     conn = await n.send(n.conn.nid,"test_event","hello, world!")
     data = await conn.recv()
     print(data)
+    await n.emit("test_broadcast",data)
 
 @n.on("test_event")
 async def test_event(request, data):
-    print(data)
     await request.send({
         "message":"test",
         "data":data
     })
+
+@n.on("test_broadcast")
+async def test_broadcast(request, data):
+    print("From Broadcast")
+    print(data)
     
     
 

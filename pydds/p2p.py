@@ -10,7 +10,7 @@ import json
 import uuid
 from .conn import *
 
-logging.basicConfig(level=logging.DEBUG)
+
 
 class UnableToConnect(Exception):
     pass
