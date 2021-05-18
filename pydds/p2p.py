@@ -1,12 +1,11 @@
 """
     This file contains classes for creating P2P connections over TCP.
 """
-import socket
+
 import trio
 
 import logging
 import struct
-import sys
 import json
 import uuid
 
@@ -371,3 +370,4 @@ class P2PConnection:
                 rmp += [peer]
         
         [self.peers.remove(p) for p in rmp if p in self.peers]
+
