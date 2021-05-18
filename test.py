@@ -11,12 +11,18 @@ app = FastAPI()
 
 @app.get("/")
 async def index():
-    await n.emit("test_event","hello, world!")
-    
+    conn = await n.send(n.conn.nid,"test_event","hello, world!")
+    data = await conn.recv()
+    print(data)
 
 @n.on("test_event")
 async def test_event(request, data):
     print(data)
+    await request.send({
+        "message":"test",
+        "data":data
+    })
+    
     
 
 async def main():

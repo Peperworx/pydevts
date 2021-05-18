@@ -8,6 +8,7 @@ import logging
 import struct
 import json
 import uuid
+from .conn import *
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -59,18 +60,16 @@ class P2PConnection:
         port = self.target_port
 
         # Create the connection
-        conn = await trio.open_tcp_stream(
-            host=host,
-            port=int(port)
-        )
+        conn = await Connection.connect(host,int(port))
+        
 
         # Request status
-        await self._send(conn, {
+        await conn.send({
             "type":"status"
         })
 
         # Recieve status
-        status = await self._recv(conn)
+        status = await conn.recv()
 
         # Make sure that we got a status ping back
         if status['type'] != 'status':
@@ -80,14 +79,14 @@ class P2PConnection:
         
 
         # TODO: Credentials Here
-        await self._send(conn, {
+        await conn.send({
             "type":"register",
             "as":"node",
             "host_port": self.server.socket.getsockname()[1]
         })
 
         # Receive details
-        data = await self._recv(conn)
+        data = await conn.recv()
         if data["type"] == "prepare_accept":
             logging.debug(f"We have been accepted")
             self.nid = data["id"]
@@ -102,11 +101,8 @@ class P2PConnection:
         """
         for peer in self.peers:
             
-            conn = await trio.open_tcp_stream(
-                host = peer["host"],
-                port = peer["port"]
-            )
-            await self._send(conn, {
+            conn = await Connection.connect(peer["host"], peer["port"])
+            await conn.send({
                 "type":"message",
                 "from":self.nid,
                 "port":self.server.socket.getsockname()[1],
@@ -124,16 +120,13 @@ class P2PConnection:
             
             if peer["id"] == peerid:
                 
-                conn = await trio.open_tcp_stream(
-                    host = peer["host"],
-                    port = peer["port"]
-                )
-                await self._send(conn, {
+                conn = await Connection.connect(peer["host"], peer["port"])
+                await conn.send({
                     "type":"message",
                     "from":self.nid,
                     "port":self.server.socket.getsockname()[1],
                     "name":name,
-                    "data":data
+                    "data":data,
                 })
                 await conn.aclose()
     
@@ -261,7 +254,7 @@ class P2PConnection:
             elif data["type"] == "message":
                 logging.debug(f"Client {host}:{data['port']} has sent message {data['name']}")
                 if data["name"] in self.messages:
-                    [await m(ss,data["data"]) for m in self.messages[data["name"]]]
+                    [await m(Connection(ss),data["data"]) for m in self.messages[data["name"]]]
             elif data["type"] == "peer_ready":
                 self.peers.append({
                     "id":data["id"],

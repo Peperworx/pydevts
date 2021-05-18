@@ -3,7 +3,7 @@
 """
 
 from . import p2p
-
+from .conn import Connection
 import trio
 
 
@@ -63,8 +63,26 @@ class Node(metaclass=AsyncCustomInitMeta):
 
         await self.conn._emit(conn, f"_{event}", data)
 
-        # Return the open connection
-        return conn
+    async def send(self, nid: str, event: str, data: dict):
+        """
+            Allows us to initiate a connection with a peer.
+        """
+        conn = None
+
+        for peer in self.conn.peers:
+            if peer["id"] == nid:
+                conn = await Connection.connect(peer["host"],peer["port"])
+        
+        if nid == self.conn.nid:
+            conn = await trio.open_tcp_stream(
+                "localhost",
+                self.conn.server.socket.getsockname()[1]
+            )
+        await self.conn._emit(conn, f"_{event}", data)
+        return Connection(
+            conn
+        )
+        
 
     async def on_enter(self):
         """
