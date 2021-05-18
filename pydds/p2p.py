@@ -29,7 +29,9 @@ class P2PConnection:
             "server_join":self._server_joined,
             "peer_joined":self._peer_joined
         }
-        
+
+        self.ready = False
+
     def listen(self, message):
         """
             Listen for a message
@@ -41,15 +43,11 @@ class P2PConnection:
             return func
         return deco
 
-    def start(self):
-        """
-            Starts the asyncio server
-        """
-        trio.run(self._start)
+
     
-    async def _start(self):
+    async def start(self):
         """
-            Internal start function
+            Starts the server
         """
         
         # Create a client object
@@ -102,21 +100,11 @@ class P2PConnection:
             # Add the initial client
             self.peers.append((self.target_address,self.target_port,))
         
-        async with trio.open_nursery() as nursery:
-            # Serve the listeners
-            nursery.start_soon(trio.serve_listeners,self._serve,[self.server])
-            nursery.start_soon(self.console)
+        
+        # Call own ready event
+        [await m(self) for m in self.messages["on_startup"]]
 
-    async def console(self):
-        """
-            Interactive message console
-        """
-        stdin = trio.wrap_file(sys.stdin)
-        while True:
-            r = (await stdin.readline())[:-1]
-            if r == "quit":
-                return
-            await self.send(0,r,b"")
+        await trio.serve_listeners(self._serve,[self.server])
             
     async def send(self, typ: int, name: str, data: bytes):
         """
