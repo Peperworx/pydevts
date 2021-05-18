@@ -184,6 +184,18 @@ class P2PConnection:
         # Send the data
         await conn.send_all(packed)
 
+    async def _emit(self, conn: trio.SocketStream, event: str, data: dict):
+        """
+            Emits an event over given stream
+        """
+        await self._send(conn, {
+            "type":"message",
+            "from":self.nid,
+            "port":self.server.socket.getsockname()[1],
+            "name":event,
+            "data":data
+        })
+
     async def _pack(self, data: dict) -> bytes:
         """
             Packs a JSON dictionary into a message for sending over TCP

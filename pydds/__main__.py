@@ -7,7 +7,7 @@ import sys
 
 
 async def main():
-    n = await Node("localhost",sys.argv[1])
+    n = Node("localhost",sys.argv[1])
     
     
     await n.run()

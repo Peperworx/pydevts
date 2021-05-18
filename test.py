@@ -11,20 +11,13 @@ app = FastAPI()
 
 @app.get("/")
 async def index():
-    await n.conn.broadcast("test event",{})
-    return n.conn.peers
+    await n.emit("test_event","hello, world!")
 
-@app.get("/setlocal/{name}/{data}")
-async def setlocal(name: str, data: str):
-    await n.__setitem__(name, data)
+@n.on("test_event")
+async def test_event(data):
+    print(data)
+    
 
-@app.get("/getlocal/{name}")
-async def getlocal(name: str):
-    return await n[name]
-
-@app.get("/store")
-async def getstore():
-    return n.store
 async def main():
     
     async with trio.open_nursery() as nursery:
