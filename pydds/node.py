@@ -10,22 +10,24 @@ import trio
 class AsyncCustomInitMeta(type):
     def __call__(cls, *args, **kwargs):
         obj = cls.__new__(cls, *args, **kwargs)
+        obj.host = kwargs["host"] if "host" in kwargs.keys() else "localhost"
+        obj.port = int(kwargs["port"]) if "port" in kwargs.keys() else 2233
         if "_init" in obj.__dir__():
-            obj._init(*args, **kwargs)
+            obj._init()
         obj.__init__(*args, **kwargs)
         return obj
 
 class Node(metaclass=AsyncCustomInitMeta):
     def __init__(self, *args, **kwargs):
         pass
-    def _init(self, host, port):
+    def _init(self):
         """
             Creates a node instance.
             Enters P2P network using entry address {host}:{port}
         """
 
         # Create the connection
-        self.conn = p2p.P2PConnection(host, port)
+        self.conn = p2p.P2PConnection(self.host, self.port)
 
         
         self.events = {

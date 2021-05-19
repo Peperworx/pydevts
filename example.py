@@ -8,7 +8,7 @@ import sys
 
 logging.basicConfig(level=logging.DEBUG)
 
-n = DBNode('localhost', sys.argv[1])
+n = DBNode(host='localhost', port=sys.argv[1])
 
 app = FastAPI()
 
