@@ -14,6 +14,8 @@ class AsyncCustomInitMeta(type):
         obj.port = int(kwargs["port"]) if "port" in kwargs.keys() else 2233
         if "_init" in obj.__dir__():
             obj._init()
+        del kwargs["port"]
+        del kwargs["host"]
         obj.__init__(*args, **kwargs)
         return obj
 
@@ -43,7 +45,7 @@ class Node(metaclass=AsyncCustomInitMeta):
         
         self._info = {
         }
-        self.store = {}
+        
         
         
     async def run(self):
@@ -149,7 +151,14 @@ class DBNode(Node):
     """
         Basic Node that implements a key/value store
     """
+    def __init__(self):
+        self.store = {}
+    
+    def __dict__(self):
+        return self.store
 
+    def get(self, k):
+        return self.store[k]
 
     async def set(self, k, v):
         await self.conn.broadcast("on_replicate",{

@@ -22,7 +22,7 @@ async def index():
 
 @app.get("/store")
 async def store():
-    return n.store
+    return n.__dict__()
 
 @app.get("/set/{name}/{value}")
 async def set(name: str, value: str):
