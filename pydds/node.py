@@ -92,6 +92,63 @@ class Node(metaclass=AsyncCustomInitMeta):
             conn
         )
     
+    async def find_node(self, func):
+        """
+            Iterates over peers, retrieving the internal data stores.
+            Takes a function, func that returns whether or not to choose the passed peer.
+            Returns the first peer for which the function returns true
+        """
+        for peer in self.conn.peers:
+            conn = await trio.open_tcp_stream(peer["host"],peer["port"])
+            await self.conn._emit(conn, f"get_data", "")
+            data = await self.conn._recv(conn)
+            if func(data):
+                return peer
+        
+        return None
+    
+    async def get_data(self, request, data):
+        """
+            Function that is called when we are asked for data
+        """
+        await request.send(self._info)
+
+    async def on_startup(self):
+        """
+            Function called when the node successfully connects to the cluster
+        """
+        ...
+    
+    
+
+    ##############################
+    #      Data Replication
+    ##############################
+
+    async def on_replicate(self, request, data: dict):
+        """
+            Function called when data needs to be replicated
+        """
+        ...
+    
+
+
+    async def on_fetch(self, request, data: dict):
+        """
+            Function called when a node needs to read a value from other nodes.
+        """
+        ...
+
+    
+    
+    
+
+class DBNode(Node):
+    """
+        Basic Node that implements a key/value store
+    """
+
+
     async def set(self, k, v):
         await self.conn.broadcast("on_replicate",{
             "key":k,
@@ -133,28 +190,6 @@ class Node(metaclass=AsyncCustomInitMeta):
         })
         
 
-
-    async def find_node(self, func):
-        """
-            Iterates over peers, retrieving the internal data stores.
-            Takes a function, func that returns whether or not to choose the passed peer.
-            Returns the first peer for which the function returns true
-        """
-        for peer in self.conn.peers:
-            conn = await trio.open_tcp_stream(peer["host"],peer["port"])
-            await self.conn._emit(conn, f"get_data", "")
-            data = await self.conn._recv(conn)
-            if func(data):
-                return peer
-        
-        return None
-
-    async def get_data(self, request, data):
-        """
-            Function that is called when we are asked for data
-        """
-        await request.send(self._info)
-
     ##############################
     #      Data Replication
     ##############################
@@ -182,16 +217,6 @@ class Node(metaclass=AsyncCustomInitMeta):
                     "value":v
                 }
             )
-
-    
-    
-    
-
-class DBNode(Node):
-    """
-        Basic Node that implements a key/value store
-    """
-
 
     
     
