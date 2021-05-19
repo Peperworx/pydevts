@@ -60,16 +60,16 @@ class P2PConnection:
         port = self.target_port
 
         # Create the connection
-        conn = await Connection.connect(host,int(port))
+        conn = await trio.open_tcp_stream(host,int(port))
         
 
         # Request status
-        await conn.send({
+        await self._send(conn,{
             "type":"status"
         })
 
         # Recieve status
-        status = await conn.recv()
+        status = await self._recv(conn)
 
         # Make sure that we got a status ping back
         if status['type'] != 'status':
@@ -79,14 +79,14 @@ class P2PConnection:
         
 
         # TODO: Credentials Here
-        await conn.send({
+        await self._send(conn, {
             "type":"register",
             "as":"node",
             "host_port": self.server.socket.getsockname()[1]
         })
 
         # Receive details
-        data = await conn.recv()
+        data = await self._recv(conn)
         if data["type"] == "prepare_accept":
             logging.debug(f"We have been accepted")
             self.nid = data["id"]
@@ -99,17 +99,21 @@ class P2PConnection:
         """
             Broadcast event {name} with data {data} to all peers.
         """
+        rmp = []
         for peer in self.peers:
-            
-            conn = await Connection.connect(peer["host"], peer["port"])
-            await conn.send({
-                "type":"message",
-                "from":self.nid,
-                "port":self.server.socket.getsockname()[1],
-                "name":name,
-                "data":data,
-            })
-            await conn.aclose()
+            try:
+                conn = await Connection.connect(peer["host"], peer["port"])
+                await conn.send({
+                    "type":"message",
+                    "from":self.nid,
+                    "port":self.server.socket.getsockname()[1],
+                    "name":name,
+                    "data":data,
+                })
+                await conn.aclose()
+            except OSError:
+                rmp += [peer]
+        [self.peers.remove(p) for p in rmp]
 
     async def sendto(self, peerid: str, name: str, data: dict):
         """

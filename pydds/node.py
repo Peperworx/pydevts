@@ -196,6 +196,7 @@ class DBNode(Node):
             "port":self.conn.server.socket.getsockname()[1],
             "name":"on_fetch",
             "data":{
+                "type":"nodedb",
                 "id":self.conn.nid
             }
         })
@@ -209,6 +210,8 @@ class DBNode(Node):
         """
             Function called when data needs to be replicated
         """
+        if data.get("type") != "nodedb":
+            return
         self.store[data["key"]] = data["value"]
     
 
@@ -218,12 +221,14 @@ class DBNode(Node):
             Function called when a node needs to read a value from other nodes.
         """
 
-
+        if data.get("type") != "nodedb":
+            return
         for k,v in self.store.items():
             await self.conn.sendto(
                 data["id"],
                 "on_replicate",
                 {
+                    "type":"nodedb",
                     "key":k,
                     "value":v
                 }

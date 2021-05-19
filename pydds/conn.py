@@ -8,9 +8,12 @@ import json
 class Connection:
     @classmethod
     async def connect(cls, host, port):
-        conn = await trio.open_tcp_stream(
-            host, port
-        )
+        try:
+            conn = await trio.open_tcp_stream(
+                host, port
+            )
+        except OSError:
+            return None
         return cls(conn)
 
     def __init__(self, conn: trio.SocketStream):
