@@ -1,5 +1,5 @@
 import trio
-from pydds.node import *
+from pydevts.node import *
 from fastapi import FastAPI
 from hypercorn.trio import serve
 from hypercorn.config import Config

@@ -1,10 +1,10 @@
-# PYDDS
+# pydevts
 
-PYDDS (Python Distributed Data System) is a distributed event system written in python and based on the concept of nodes that is designed for the implementation of data stores and other replicated systems.
+pydevts (Python Distributed Data System) is a distributed event system written in python and based on the concept of nodes that is designed for the implementation of data stores and other replicated systems.
 
-PYDDS is based upon a simple concept: A cluster of nodes that can send and recieve events.
+pydevts is based upon a simple concept: A cluster of nodes that can send and recieve events.
 
-PYDDS is also lightweight, requiring only the external library [trio](https://github.com/python-trio/trio) although some examples may require additional libraries (these will be detailed in the examples description)
+pydevts is also lightweight, requiring only the external library [trio](https://github.com/python-trio/trio) although some examples may require additional libraries (these will be detailed in the examples description)
 
 
 ## How do I use this?
@@ -22,7 +22,7 @@ A cluster port is a port with which a client will try to connect to a cluster. I
 
 #### Host Ports
 
-Sometimes PYDDS Nodes will run another application alongside themselves when running. If this application is a server of some kind, it's public facing port is called a Host Port.
+Sometimes pydevts Nodes will run another application alongside themselves when running. If this application is a server of some kind, it's public facing port is called a Host Port.
 
 ### Examples
 
@@ -34,7 +34,7 @@ External Requirements:
 - fastapi
 - hypercorn
 
-This example details how to run another async application (FastAPI with hypercorn) alongside PYDDS.
+This example details how to run another async application (FastAPI with hypercorn) alongside pydevts.
 
 It takes two arguments:
 - The cluster port to attempt to connect to

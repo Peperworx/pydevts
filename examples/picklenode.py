@@ -2,7 +2,7 @@
     This example shows how you can implement a custom node type to store a pickled object
 """
 
-from pydds import Node, Connection
+from pydevts import Node, Connection
 
 import pickle
 import trio
