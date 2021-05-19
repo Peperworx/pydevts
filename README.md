@@ -4,7 +4,8 @@ PYDDS (Python Distributed Data System) is a distributed event system written in 
 
 PYDDS is based upon a simple concept: A cluster of nodes that can send and recieve events.
 
-PYDDS allows the implementation of different "nodes" and while PYDDS comes with some default nodes, the project is designed for the *implementation* of nodes.
+PYDDS is also lightweight, requiring only the external library [trio](https://github.com/python-trio/trio) although some examples may require additional libraries (these will be detailed in the examples description)
+
 
 ## How do I use this?
 
@@ -29,6 +30,10 @@ Listed below are some of the examples found in the `examples/` directory. All ex
 
 #### fastapi_example.py
 
+External Requirements:
+- fastapi
+- hypercorn
+
 This example details how to run another async application (FastAPI with hypercorn) alongside PYDDS.
 
 It takes two arguments:
@@ -36,6 +41,9 @@ It takes two arguments:
 - The host port to host the fastapi application on
 
 #### picklenode.py
+
+External Requirements:
+- None
 
 NOTICE: This should never be used with untrusted data, as pickle can be used to execute untrusted code.
 
@@ -46,6 +54,9 @@ This example takes two arguments:
 - The literal string 'w' (without the quotes) if we want the cluster to update the value. If we do not provide this, the cluster will simply read the value every second and print it.
 
 #### picklenodewriter.py
+
+External Requirements:
+- None
 
 NOTICE: This should never be used with untrusted data, as pickle can be used to execute untrusted code.
 
