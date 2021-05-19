@@ -1,10 +1,8 @@
 # PYDDS
 
-PYDDS (Python Distributed Data System) is a distributed data store and event system written in python and based on the concept of nodes.
+PYDDS (Python Distributed Data System) is a distributed event system written in python and based on the concept of nodes that is designed for the implementation of data stores and other replicated systems.
 
-PYDDS is beign developed for [schuaro](https://github.com/peperworx/schuaro) but is being developed as a separate project. It is intended for use as a cache and for messaging between backend services.
-
-PYDDS is a super simple concept: A cluster of nodes that can send and recieve events.
+PYDDS is based upon a simple concept: A cluster of nodes that can send and recieve events.
 
 PYDDS allows the implementation of different "nodes" and while PYDDS comes with some default nodes, the project is designed for the *implementation* of nodes.
 
