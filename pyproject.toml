@@ -1,8 +1,10 @@
 [tool.poetry]
 name = "pydds"
-version = "0.0.1"
+version = "0.0.2"
 description = "PYDDS (PYthon Distributed Data Store) Is a distributed data store and message service based ont he concept of nodes and built with python."
 authors = ["Riley Wilton <meetingprince34@outlook.com>"]
+readme = "README.md"
+repository = "https://github.com/Peperworx/pydds"
 
 [tool.poetry.dependencies]
 python = "^3.9"
