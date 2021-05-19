@@ -12,6 +12,7 @@ import logging
 import base64
 
 class PickleWriterNode(Node):
+    
     async def on_replicate(self, request, data: dict):
         if data.get("type") != "picklenode":
             return
