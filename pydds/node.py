@@ -121,7 +121,11 @@ class Node(metaclass=AsyncCustomInitMeta):
         """
             Function called when the node successfully connects to the cluster
         """
-        ...
+        
+        self._info = {
+            "id":self.conn.nid,
+            "init":False
+        }
     
     
 
@@ -186,6 +190,10 @@ class DBNode(Node):
 
         n = await self.find_node(lambda a: a["init"]==True)
         
+        if not n: # If we can find no other initialized nodes, just continue
+            self._info["init"] = True
+            return
+
         # Create connection to this peer
         cn: Connection = await Connection.connect(n["host"],n["port"])
 
