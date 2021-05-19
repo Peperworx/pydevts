@@ -28,11 +28,20 @@ class Node(metaclass=AsyncCustomInitMeta):
         self.conn = p2p.P2PConnection(host, port)
 
         
-        self.events = {}
+        self.events = {
+            "on_startup": self.on_startup,
+            "on_replicate": self.on_replicate,
+            "on_fetch": self.on_fetch,
+            "get_data": self.get_data,
+        }
 
         # Register the events
         for k,v in self.events.items():
             self.conn.listen(k)(v)
+        
+        self._info = {
+        }
+        self.store = {}
         
         
     async def run(self):
@@ -71,7 +80,7 @@ class Node(metaclass=AsyncCustomInitMeta):
 
         for peer in self.conn.peers:
             if peer["id"] == nid:
-                conn = await Connection.connect(peer["host"],peer["port"])
+                conn = await trio.open_tcp_stream(peer["host"],peer["port"])
         
         if nid == self.conn.nid:
             conn = await trio.open_tcp_stream(
@@ -82,12 +91,69 @@ class Node(metaclass=AsyncCustomInitMeta):
         return Connection(
             conn
         )
-        
+    
+    async def set(self, k, v):
+        await self.conn.broadcast("on_replicate",{
+            "key":k,
+            "value":v
+        })
 
-    async def on_enter(self):
+        self.store[k] = v
+
+    async def on_startup(self):
         """
             Function called when the node successfully connects to the cluster
         """
+
+        self._info = {
+            "id":self.conn.nid,
+            "keys_known":[],
+            "init":False
+        }
+        
+        
+        if len(self.conn.peers) == 0:
+            self._info["init"] = True
+            return
+
+        n = await self.find_node(lambda a: a["init"]==True)
+        
+        # Create connection to this peer
+        cn: Connection = await Connection.connect(n["host"],n["port"])
+
+        # Send a message
+        await cn.send({
+            "type":"message",
+            "from":self.conn.nid,
+            "port":self.conn.server.socket.getsockname()[1],
+            "name":"on_fetch",
+            "data":{
+                "id":self.conn.nid
+            }
+        })
+        
+
+
+    async def find_node(self, func):
+        """
+            Iterates over peers, retrieving the internal data stores.
+            Takes a function, func that returns whether or not to choose the passed peer.
+            Returns the first peer for which the function returns true
+        """
+        for peer in self.conn.peers:
+            conn = await trio.open_tcp_stream(peer["host"],peer["port"])
+            await self.conn._emit(conn, f"get_data", "")
+            data = await self.conn._recv(conn)
+            if func(data):
+                return peer
+        
+        return None
+
+    async def get_data(self, request, data):
+        """
+            Function that is called when we are asked for data
+        """
+        await request.send(self._info)
 
     ##############################
     #      Data Replication
@@ -97,7 +163,7 @@ class Node(metaclass=AsyncCustomInitMeta):
         """
             Function called when data needs to be replicated
         """
-        ...
+        self.store[data["key"]] = data["value"]
     
 
 
@@ -105,7 +171,18 @@ class Node(metaclass=AsyncCustomInitMeta):
         """
             Function called when a node needs to read a value from other nodes.
         """
-        ...
+
+
+        for k,v in self.store.items():
+            await self.conn.sendto(
+                data["id"],
+                "on_replicate",
+                {
+                    "key":k,
+                    "value":v
+                }
+            )
+
     
     
     
@@ -115,6 +192,8 @@ class DBNode(Node):
         Basic Node that implements a key/value store
     """
 
+
+    
     
     
 

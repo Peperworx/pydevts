@@ -19,6 +19,15 @@ async def index():
     print(data)
     await n.emit("test_broadcast",data)
 
+
+@app.get("/store")
+async def store():
+    return n.store
+
+@app.get("/set/{name}/{value}")
+async def set(name: str, value: str):
+    await n.set(name,value)
+
 @n.on("test_event")
 async def test_event(request, data):
     await request.send({
@@ -31,7 +40,7 @@ async def test_broadcast(request, data):
     print("From Broadcast")
     print(data)
     
-    
+
 
 async def main():
     
