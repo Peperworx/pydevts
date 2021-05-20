@@ -45,7 +45,7 @@ class Connection:
         
         # Pack data
         packed = self._pack(data)
-
+        
         # Send data
         await self.wrapped.send(packed)
     
@@ -70,7 +70,7 @@ class Connection:
 
         # Decode the data
         decoded = base64.b64decode(data).decode()
-
+        
         # Load the data and return
         return json.loads(decoded)
 
@@ -90,8 +90,8 @@ class Connection:
         encoded = base64.b64encode(dumped.encode())
 
         # Grab the length
-        data_len = len(dumped)
-
+        data_len = len(encoded)
+        
         # Add the packed length
         ret += struct.pack("L",data_len)
 

@@ -93,6 +93,13 @@ class P2PNode:
         # Wrap the connection
         conn = Connection(ss)
 
-        # Loop until we fail
-        while True:
-            raise Exception("yeehaw")
+        try:
+            # Loop until we fail
+            while True:
+
+                # Receive data
+                data = await conn.recv()
+                
+        except anyio.EndOfStream:
+            # Ignore EndOfStream
+            pass
