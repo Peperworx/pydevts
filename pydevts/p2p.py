@@ -22,7 +22,7 @@ class P2PNode:
         A basic peer to peer node.
     """
 
-    known_nodes: list[str] # A List of the NIDs of all known nodes.
+    known_nodes: dict[str,dict] # A List of the NIDs of all known nodes.
     nid: str # The node ID of this node
     server: MultiListener # The anyio server listener
     listen_port: int # The port to listen on
@@ -32,16 +32,64 @@ class P2PNode:
         """
             A basic multi peer peer to peer node.
         """
-        self.known_nodes = []
-        self.nid = uuid.uuid4()
+        self.known_nodes = {}
+        self.nid = str(uuid.uuid4())
     
-    async def join(self,host,port):
+    async def join(self,host: str,port: int):
         """
             Join a cluster.
         """
         
         # Initialize local server
         await self._initialize()
+
+
+        # Initiate a connection with the server
+        try:
+            conn = Connection(await anyio.connect_tcp(
+                remote_host = host,
+                remote_port = port
+            ))
+        except:
+            logger.warning(f"Unable to connect to {host}:{port}. Continuing")
+            return
+        
+        # Prepare test payload
+        test_payload = {"type":"status","random":os.urandom(32).hex()}
+
+        # Send payload
+        await conn.send(test_payload)
+
+        # Receive test.
+        returned_test = await conn.recv()
+
+        # If they are not the same, just exit and be ready to start.
+        if test_payload != returned_test:
+            logger.warning(f"Unable to connect to {host}:{port}. Continuing")
+            return
+        
+        # Request to join.
+        # TODO: Credentials here
+        await conn.send({
+            "type":"register",
+            "port":self.listen_port
+        })
+
+        # Receive details
+        details = await conn.recv()
+        if details["type"] == "prepare_accept":
+            logger.debug("This node has been accepted to the cluster.")
+            self.nid = details["nid"]
+            self.known_nodes = details["known_nodes"]
+        
+        # Request the graph
+        await conn.send({
+            "type":"graph",
+            "redirect_port":self.listen_port,
+            "graph":{}
+        })
+
+        await self.run()
 
 
     async def start(self):
@@ -93,13 +141,86 @@ class P2PNode:
         # Wrap the connection
         conn = Connection(ss)
 
+        # Grab the host and port
+        host = ss._raw_socket.getpeername()[0]
+        port = ss._raw_socket.getpeername()[1]
+
+        logger.debug(f"Connection from {host}:{port}")
+
         try:
             # Loop until we fail
-            while True:
+            async for data in conn:
 
-                # Receive data
-                data = await conn.recv()
+                if data["type"] == "status":
+                    await conn.send(data)
+                elif data["type"] == "register":
+                    logger.debug(f"{host}:{port} wants to join the cluster")
+                    await self._node_registers(conn, data, host, port)
+                elif data["type"] == "graph":
+                    await self._request_graph(conn, data, host, port)
                 
         except anyio.EndOfStream:
             # Ignore EndOfStream
-            pass
+            logger.debug(f"{host}:{port} disconnected")
+    
+    async def _node_registers(self, conn, data, host, port):
+        """
+            This function is called when a node attempts to connect to the cluster.
+        """
+        # TODO: Authentication here
+
+        # Issue a node id
+        nid = str(uuid.uuid4())
+
+        
+
+        # Tell the client they have been accepted
+        # Include the nodes that we know, including ourselves.
+        await conn.send({
+            "type":"prepare_accept",
+            "from":self.nid,
+            "nid":nid,
+            "known_nodes":self.known_nodes | {
+                self.nid:{
+                    "host": socket.gethostbyname(socket.gethostname()),
+                    "port": self.listen_port,
+                }
+            }
+        })
+
+
+        # Add to nodes
+        self.known_nodes[nid] = {
+            "host":host,
+            "port":data["port"]
+        }
+        
+
+        logger.info(f"Peer {nid} has joined the cluster.")
+
+    async def recursive_request_graph(self, graph):
+        pass
+
+    async def _request_graph(self, conn, data, host, port):
+        """
+            Returns the graph of the cluster
+        """
+        graph = data["graph"] | {
+            self.nid:list(self.known_nodes.keys())
+        }
+        print(graph)
+        # Now for each of the keys we know, request the graph
+        for k,peer in self.known_nodes.items():
+            if k not in graph.keys():
+                conn = Connection(await anyio.connect_tcp(
+                    remote_host = peer["host"],
+                    remote_port = peer["port"]
+                ))
+                print(k)
+                await conn.send({"type":"graph","graph":graph})
+                g = await conn.recv()
+                graph[k] = g[k]
+        
+        print("graph")
+
+        await conn.send(graph)

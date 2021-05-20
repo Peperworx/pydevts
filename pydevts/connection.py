@@ -14,6 +14,7 @@ import struct
 import socket
 import base64
 import typing
+from functools import wraps
 
 
 
@@ -74,6 +75,22 @@ class Connection:
         # Load the data and return
         return json.loads(decoded)
 
+    
+    def __aiter__(self, *args, **kwargs):
+        return self
+
+    
+    async def __anext__(self, *args, **kwargs):
+        return self._unpack(await self.wrapped.__anext__(*args, **kwargs))
+
+    
+    async def __aenter__(self, *args, **kwargs):
+        return await self.wrapped.__aenter__(*args, **kwargs)
+    
+    
+    async def __aexit__(self, *args, **kwargs):
+        return await self.wrapped.__aexit__(*args, **kwargs)
+
     @staticmethod
     def _pack(data: dict) -> bytearray:
         """
@@ -107,7 +124,7 @@ class Connection:
         """
 
         # Grab the data length
-        data_len = struct.unpack("L",data[:struct.calcsize("L")])
+        data_len = struct.unpack("L",data[:struct.calcsize("L")])[0]
 
         # Skip header
         content = data[struct.calcsize("L"):]
