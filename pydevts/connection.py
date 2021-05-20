@@ -1,70 +1,119 @@
 """
-    Provides wrapper classes for anyio TCP requests.
+    Implements custom TCP connection wrappers.
 """
-
 import anyio
-import struct
-import binascii
+
+from .errors import *
+
+# We need some secret stuff :)
+from anyio._core._sockets import SocketStream
+
+# Standard imports
 import json
+import struct
+import socket
+import base64
+import typing
+
+
 
 class Connection:
-    def __init__(self, wrapped):
+    """
+        Anyio TCP connection wrapper.
+    """
+
+    wrapped: SocketStream
+    raw: socket.socket
+    host: int
+    port: int
+
+    def __init__(self, wrapped: SocketStream):
         """
-            Anyio TCP wrapper that can send JSON encodable dictionaries.
+            Wraps an anyio SocketStream.
         """
+        
         self.wrapped = wrapped
-
-        # Calculate size of 'L'
-        self.offset = struct.calcsize('L')
+        self.raw = wrapped._raw_socket
+        self.host = self.raw.getsockname()[0]
+        self.port = self.raw.getsockname()[1]
     
-    async def receive(self) -> dict:
+
+    async def send(self, data: dict) -> typing.Literal[None]:
         """
-            Receive JSON dictionary over TCP.
+            Sends JSON encodable dictionary over socket.
+        """
+        
+        # Pack data
+        packed = self._pack(data)
+
+        # Send data
+        await self.wrapped.send(packed)
+    
+    async def recv(self) -> dict:
+        """
+            Recieves a JSON encoded dictionary over socket.
         """
 
-        try:
-            # Receive the header
-            header = await self.wrapped.receive(self.offset)
-        except anyio.EndOfStream:
-            return None
-        # If it is less than the required size, return None
-        if len(header) < self.offset:
-            return None
+        # Recieve the header
+        header = await self.wrapped.receive(struct.calcsize('L'))
+
+        # Check the header length
+        if len(header) < struct.calcsize('L'):
+            # If it is to short, raise an error
+            raise HeaderParseError("Received a smaller header than expected")
         
-        
-        # Parse the header
-        headerp = struct.unpack('L',header)
-        
-        # Read the data
-        data = await self.wrapped.receive(headerp[0])
-        
-        try:
-            # Parse the data
-            parsed = json.loads(data.decode())
-        except json.JSONDecodeError:
-            # If it fails to decode, return None
-            return None
-        
-        # Return
-        return parsed
-    
-    async def send(self, data: dict):
+        # Unpack the data
+        header = struct.unpack('L', header)
+
+        # Recieve the rest of the data
+        data = await self.wrapped.receive(header[0])
+
+        # Decode the data
+        decoded = base64.b64decode(data).decode()
+
+        # Load the data and return
+        return json.loads(decoded)
+
+    @staticmethod
+    def _pack(data: dict) -> bytearray:
         """
-            Send JSON parsable data to the peer.
+            Packs a JSON encodable dictionary into a bytearray.
         """
-        
-        # Dump the data. Let exceptions be raised
-        dumped = json.dumps(data)
+
+        # Initialize return value
+        ret = bytearray()
+
+        # Dump JSON
+        dumped = json.dumps(data,separators=(",",":"))
+
+        # Encode JSON
+        encoded = base64.b64encode(dumped.encode())
 
         # Grab the length
         data_len = len(dumped)
 
-        # Encode the header
-        header = struct.pack('L', data_len)
+        # Add the packed length
+        ret += struct.pack("L",data_len)
 
-        # Prepare the payload
-        payload = header + dumped.encode()
-        
-        # Send the data
-        await self.wrapped.send(payload)
-        
+        # Add the data
+        ret += encoded
+
+        # Return
+        return ret
+    @staticmethod
+    def _unpack(data: bytearray) -> dict:
+        """
+            Unpacks encoded JSON into a dictionary. Inverse of _pack
+        """
+
+        # Grab the data length
+        data_len = struct.unpack("L",data[:struct.calcsize("L")])
+
+        # Skip header
+        content = data[struct.calcsize("L"):]
+
+        # Decode
+        decoded = base64.b64decode(content[:data_len]).decode()
+
+        # Parse and return
+        return json.loads(decoded)
