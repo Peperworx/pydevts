@@ -32,8 +32,14 @@ class BasicRouter(RouterBase):
             - {data}
                 The raw data in bytes
         """
-        pass
+        for i in self.peers:
+            if i[0] == target:
+                self.owner.send_to(
+                    i[1], i[2], data
+                )
 
+    async def _recv_internal(self, name: str, value: bytes):
+        print(name, value)
     async def receive(self, data: bytes) -> Optional[bytes]:
         """
             Executed when raw data is received
@@ -44,13 +50,19 @@ class BasicRouter(RouterBase):
         
 
         # Unpack header
-        header = struct.unpack("B", data[:struct.calcsize("B")])
-        data = data[struct.calcsize("B"):]
+        header = struct.unpack("BHL", data[:struct.calcsize("BHL")])
+        data = data[struct.calcsize("BHL"):]
 
         # If it is an internal message, treat as such
         if header[0] == 0:
-            message = msgpack.loads(data)
-            self._recv_internal(message)
+            name = data[:header[1]]
+            data = data[header[1]:]
+            value = data[:header[2]]
+            data = data[header[2]:]
+
+            await self._recv_internal(name.decode(),value)
+
+            return data
         else:
             return data
 
