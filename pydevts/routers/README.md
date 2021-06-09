@@ -54,3 +54,27 @@ for i, peer in enumerate(peers):
     packet = generate_packet(to,i)
     peer.send_packet()
 ```
+
+The peer then accepts the packet, adds the index of the sender to the end of the packet, and then forwards the packet along the network in the same manner.
+
+When the node that owns the node id recieves the packet, it adds the previous node to the list, and then uses the odd and even 32 bit integers in the packet to generate two lists looking like so:
+
+|  SEND  |  RECV  |
+-------------------
+|   01   |   33   |
+|   11   |   12   |
+|   22   |   27   |
+
+Where RECV is the list of indexes to get to the node, and SEND is the list of indexes to get back from the node.
+
+This list is than saved on the recepient node under the node id of its sender, and then it used this list to send a message containing these lists back to the sender node.
+
+After this is complete, this same list can be used to generate routes to and from the sender node.
+
+If multiple routes are found, they are sorted according to length, and used if any hops are unable to be made, or routing fails (due to disconnected and reconnected node, network failures, etc.)
+
+If all routes fail, the entire process can be re-attempted, and if that fails, hop count is increased and the connection is re-attempted. If this fails, it can be assumed that the node no-longer exists.
+
+## Notify Pathfinding
+
+The pathfinding system can also be used to map the entire network by sending a "broadcast" siginal instead of a direct connection to a specific node ID. This will cause all nodes to send back the info as if they were the recepient, and then continue to forward the request. This can be used for administration purposes, and also for a system similar to the 'Everyone knows Everyone' system, but scalable.
