@@ -31,33 +31,48 @@ class EKERouter(RouterBase):
         """
         
         
-        self.peers.append(("entry",host,port))
+        conn = await Connection.connect(host,port)
         
-        conn = await self._send("entry", {
-            "type":"connect",
-            "host": socket.gethostbyname(socket.getfqdn()),
-            "port": self.owner.listen_port
+        await conn.send({
+            "type":"peer_connect",
+            "port": self.owner.listen_port,
+
         })
+        
         
 
         data = await conn.recv()
         
         if data["type"] == "ack_connect":
-            self.owner.nid = data["uid"]
-            self.peers = [(data["my_uid"],host,port)] + data["peers"]
+            self.owner.nid = data["nid"]
+            self.peers = [(data["entry_nid"],host,port,conn.port)] + data["peers"]
         else:
             raise RuntimeError("Unexpected response")
         
         await self._cleanup()
-        print(self.peers)
+        
+
+        return {
+            "entry":{
+                "nid": data["entry_nid"],
+                "host": conn.host,
+                "port": port,
+                "cliport": conn.port,
+            }
+        }
+
 
     
     async def _send(self, target: str, data: dict) -> Connection:
         for p in self.peers:
-            if p[0] == target:
-                conn = await Connection.connect(p[1],p[2])
-                await conn.send(data)
-                return conn
+            try:
+                if p[0] == target:
+                    conn = await Connection.connect(p[1],p[2])
+                    await conn.send(data)
+                    return conn
+            except OSError:
+                self.peers.remove(p)
+                raise
     
     async def _cleanup(self):
         """
@@ -72,8 +87,9 @@ class EKERouter(RouterBase):
 
                 await conn.aclose()
             except OSError:
-                rmp.append(p)
+                rmp += [p]
         [self.peers.remove(p) for p in rmp]
+        
     async def send(self, target: str, data: bytes) -> Connection:
         """
             Executed when node wants to send raw data
@@ -83,13 +99,15 @@ class EKERouter(RouterBase):
             - {data}
                 The raw data in bytes
         """
-        
         for p in self.peers:
-            if p[0] == target:
-                conn = await Connection.connect(p[1],p[2])
-                await conn.send({"type":"data","body":data})
-                return conn
-
+            try:
+                if p[0] == target:
+                    conn = await Connection.connect(p[1],p[2])
+                    await conn.send({"type":"data","body":data})
+                    return conn
+            except OSError:
+                self.peers.remove(p)
+                raise
     async def receive(self, conn: Connection) -> Optional[bytes]:
         """
             Executed when raw data is received
@@ -100,21 +118,52 @@ class EKERouter(RouterBase):
         
         data = await conn.recv()
 
-        if data["type"] == "connect":
-            uid = str(uuid.uuid4())
+        if data["type"] == "peer_connect":
+            nid = str(uuid.uuid4())
 
             await conn.send({
                 "type":"ack_connect",
-                "uid": uid,
-                "my_uid": self.owner.nid,
+                "nid": nid,
+                "entry_nid": self.owner.nid,
                 "peers":self.peers
             })
+            rmp = []
+            for peer in self.peers:
+                try:
+                    conn = await Connection.connect(peer[1],peer[2])
+                    await conn.send({
+                        "type": "peer_join",
+                        "nid": nid,
+                        "host": conn.host,
+                        "port": data["port"],
+                        "entry": self.owner.nid,
+                        "cliport": conn.port,
+                    })
+                    await conn.aclose()
+                except OSError:
+                    rmp += [peer]
+            [self.peers.remove(i) for i in rmp]
 
-            self.peers.append((uid,data["host"],data["port"]))
+            self.peers.append((nid,conn.host,data["port"],conn.port))
 
             await self._cleanup()
 
-            print(self.peers)
-        elif data["type"] == "data":
-            return data["body"]
+            
+            data["nid"] = nid
+            data["host"] = conn.host
+            data["cliport"] = conn.port
+            return data
+        elif data["type"] == "peer_join":
+            self.peers.append((
+                data["nid"],
+                conn.host,
+                data["port"],
+                data["cliport"]
+            ))
+
+            await self._cleanup()
+            
+            
+            return data
+        return data
             

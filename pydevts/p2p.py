@@ -34,7 +34,10 @@ class P2PNode:
         await self._initialize()
 
 
-        await self.router.connect_to(host, port)
+        entry = (await self.router.connect_to(host, port))["entry"]
+
+
+        logger.info(f'Connected to network through entry node {entry["nid"]}@{entry["host"]}:{entry["port"]}/{entry["cliport"]}')
 
         await self.run()
 
@@ -67,7 +70,7 @@ class P2PNode:
 
 
         # Log
-        logger.debug(f"Created listener at host 0.0.0.0:{self.listen_port}")
+        logger.info(f"Created listener at host 0.0.0.0:{self.listen_port}")
 
 
 
@@ -97,8 +100,14 @@ class P2PNode:
             while True:
                 
                 data = await self.router.receive(conn)
-                print(data)
-
+                
+                if data["type"] == "peer_connect":
+                    logger.info(f'Peer {data["nid"]}@{data["host"]}:{data["port"]}/{data["cliport"]} is connecting through this node')
+                elif data["type"] == "peer_join":
+                    logger.info(f'Peer {data["nid"]}@{data["host"]}:{data["port"]}/{data["cliport"]} has joind through entry node {data["entry"]}')
+                elif data["type"] == "ping":
+                    pass
+        
         except anyio.EndOfStream:
             # Ignore EndOfStream
             logger.debug(f"{conn.host}:{conn.port} disconnected")
