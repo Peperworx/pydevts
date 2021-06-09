@@ -21,7 +21,16 @@ class Connection:
     
     @classmethod
     async def connect(cls, host: str, port: int):
-        return cls(await anyio.connect_tcp(host, port))
+        s = await anyio.connect_tcp(host, int(port))
+        return cls(s)
+    
+    def __aiter__(self):
+        return self
+    
+    async def __anext__(self):
+        return await self.recv()
+    
+
     
     async def send(self, data: dict):
         """
@@ -46,5 +55,8 @@ class Connection:
         """
             Receives raw data over the connection
         """
-        header = struct.unpack("L",self.wrapped.receive(struct.calcsize("L")))
+        header = struct.unpack("L", await self.wrapped.receive(struct.calcsize("L")))
         return await self.wrapped.receive(header[0])
+    
+    async def aclose(self):
+        return await self.wrapped.aclose()
