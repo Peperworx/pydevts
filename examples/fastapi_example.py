@@ -1,7 +1,7 @@
-import trio
+import asyncio
 from pydevts.node import *
 from fastapi import FastAPI
-from hypercorn.trio import serve
+from hypercorn.asyncio import serve
 from hypercorn.config import Config
 import logging
 import sys
@@ -43,13 +43,14 @@ async def test_broadcast(data):
 
 
 async def main():
+    t1 = asyncio.create_task(n.run())
+    c = Config()
+    c.bind = [f"localhost:{sys.argv[2]}"]
+    t2 = asyncio.create_task(serve(app, c))
     
-    async with trio.open_nursery() as nursery:
-        nursery.start_soon(n.run)
-        c = Config()
-        c.bind = [f"localhost:{sys.argv[2]}"]
-        nursery.start_soon(serve,app,c)
+    await t1
+    await t2
 
 
 if __name__ == '__main__':
-    trio.run(main)
+    asyncio.run(main())
