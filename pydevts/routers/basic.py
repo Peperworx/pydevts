@@ -8,6 +8,7 @@ from typing import Optional
 from pydevts.conn import Connection
 import socket
 import uuid
+import anyio
 
 class EKERouter(RouterBase):
     """
@@ -30,9 +31,11 @@ class EKERouter(RouterBase):
                 Port of the entry node
         """
         
-        
-        conn = await Connection.connect(host,port)
-        
+        try:
+            conn = await Connection.connect(host,port)
+        except OSError:
+            
+            return None
         await conn.send({
             "type":"peer_connect",
             "port": self.owner.listen_port,
@@ -40,8 +43,9 @@ class EKERouter(RouterBase):
         })
         
         
-
+        
         data = await conn.recv()
+        
         
         if data["type"] == "ack_connect":
             self.owner.nid = data["nid"]
@@ -72,11 +76,13 @@ class EKERouter(RouterBase):
         for p in self.peers:
             try:
                 conn = await Connection.connect(p[1],p[2])
-                await conn.send({"type":"data","body":data})
+                await conn.send({"type":"data","bcast":True,"body":data})
                 await conn.aclose()
             except OSError:
                 rmp += [p]
         [self.peers.remove(p) for p in rmp]
+
+        
 
 
     
@@ -117,16 +123,23 @@ class EKERouter(RouterBase):
             - {data}
                 The raw data in bytes
         """
+
+        if target == self.owner.nid:
+            conn = await Connection.connect("localhost", self.owner.listen_port)
+            await conn.send({"type":"data","bcast":False,"body":data})
+            return conn
         rmp = []
         for p in self.peers:
             try:
                 if p[0] == target:
                     conn = await Connection.connect(p[1],p[2])
-                    await conn.send({"type":"data","body":data})
+                    await conn.send({"type":"data","bcast":False,"body":data})
                     return conn
             except OSError:
                 rmp += [p]
         [self.peers.remove(p) for p in rmp]
+
+        
     
     async def receive(self, conn: Connection) -> Optional[bytes]:
         """

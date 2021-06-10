@@ -20,6 +20,7 @@ class P2PNode:
     listen_port: int # The port to listen on
     router: EKERouter
     callbacks: dict[str, list[FunctionType]]
+    entry: dict # The entry node
 
     def __init__(self):
         """
@@ -38,9 +39,14 @@ class P2PNode:
         await self._initialize()
 
 
-        entry = (await self.router.connect_to(host, port))["entry"]
+        entry = (await self.router.connect_to(host, port))
 
+        if entry == None:
+            logger.info(f'Unable to connect to network through node {host}:{port}. Creating network')
+            await self.run()
 
+        self.entry = entry["entry"]
+        entry = self.entry
         logger.info(f'Connected to network through entry node {entry["nid"]}@{entry["host"]}:{entry["port"]}/{entry["cliport"]}')
 
         await self.run()
@@ -138,10 +144,13 @@ class P2PNode:
                 elif data["type"] == "ping":
                     pass
                 elif data["type"] == "data":
-                    data = msgpack.loads(data["data"])
-                    if data["name"] in self.callbacks.keys():
-                        for v in self.callbacks[data["name"]]:
-                            await v(conn, data["data"])
+                    dat = msgpack.loads(data["body"])
+                    if dat["name"] in self.callbacks.keys():
+                        for v in self.callbacks[dat["name"]]:
+                            if data["bcast"]:
+                                await v(dat["data"])
+                            else:
+                                await v(conn, dat["data"])
         
         except anyio.EndOfStream:
             # Ignore EndOfStream
