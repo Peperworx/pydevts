@@ -60,10 +60,28 @@ class EKERouter(RouterBase):
                 "cliport": conn.port,
             }
         }
+    
+    async def emit(self, data: bytes):
+        """
+            Executed when a noad wants to broadcast raw data
+            Arguments
+            - {data}
+                The raw data in bytes
+        """
+        rmp = []
+        for p in self.peers:
+            try:
+                conn = await Connection.connect(p[1],p[2])
+                await conn.send({"type":"data","body":data})
+                await conn.aclose()
+            except OSError:
+                rmp += [p]
+        [self.peers.remove(p) for p in rmp]
 
 
     
     async def _send(self, target: str, data: dict) -> Connection:
+        rmp = []
         for p in self.peers:
             try:
                 if p[0] == target:
@@ -71,8 +89,8 @@ class EKERouter(RouterBase):
                     await conn.send(data)
                     return conn
             except OSError:
-                self.peers.remove(p)
-                raise
+                rmp += [p]
+        [self.peers.remove(p) for p in rmp]
     
     async def _cleanup(self):
         """
@@ -99,6 +117,7 @@ class EKERouter(RouterBase):
             - {data}
                 The raw data in bytes
         """
+        rmp = []
         for p in self.peers:
             try:
                 if p[0] == target:
@@ -106,8 +125,9 @@ class EKERouter(RouterBase):
                     await conn.send({"type":"data","body":data})
                     return conn
             except OSError:
-                self.peers.remove(p)
-                raise
+                rmp += [p]
+        [self.peers.remove(p) for p in rmp]
+    
     async def receive(self, conn: Connection) -> Optional[bytes]:
         """
             Executed when raw data is received

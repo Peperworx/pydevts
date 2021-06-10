@@ -6,6 +6,8 @@ from loguru import logger
 from .conn import Connection
 from .routers.basic import EKERouter
 from . import errors
+import msgpack
+from types import FunctionType
 
 class P2PNode:
     """
@@ -17,6 +19,7 @@ class P2PNode:
     server: MultiListener # The anyio server listener
     listen_port: int # The port to listen on
     router: EKERouter
+    callbacks: dict[str, list[FunctionType]]
 
     def __init__(self):
         """
@@ -24,6 +27,7 @@ class P2PNode:
         """
         self.nid = str(uuid.uuid4())
         self.router = EKERouter(self)
+        self.callbacks = {}
 
     async def join(self,host: str,port: int):
         """
@@ -72,7 +76,33 @@ class P2PNode:
         # Log
         logger.info(f"Created listener at host 0.0.0.0:{self.listen_port}")
 
+    async def send(self, target: str, name: str, data: dict):
+        """
+            Sends an event to a specific target
+        """
 
+        await self.router.send(target, msgpack.dumps({
+            "name":name,
+            "data":data
+        }))
+    
+    async def emit(self, name: str, data: dict):
+        """
+            Broadcasts an event to the entire network.
+        """
+
+        await self.router.emit(msgpack.dumps({
+            "name": name,
+            "data": data
+        }))
+
+    async def on(self, name: str, func: FunctionType):
+        """
+            Registers callback for event
+        """
+        if name not in self.callbacks.keys():
+            self.callbacks[name] = []
+        self.callbacks[name] += [func]
 
     async def run(self):
         """
@@ -107,6 +137,11 @@ class P2PNode:
                     logger.info(f'Peer {data["nid"]}@{data["host"]}:{data["port"]}/{data["cliport"]} has joind through entry node {data["entry"]}')
                 elif data["type"] == "ping":
                     pass
+                elif data["type"] == "data":
+                    data = msgpack.loads(data["data"])
+                    if data["name"] in self.callbacks.keys():
+                        for v in self.callbacks[data["name"]]:
+                            await v(data["data"])
         
         except anyio.EndOfStream:
             # Ignore EndOfStream

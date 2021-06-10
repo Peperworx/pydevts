@@ -22,6 +22,15 @@ class RouterBase:
         """
         pass
     
+    async def emit(self, data: bytes):
+        """
+            Executed when a noad wants to broadcast raw data
+            Arguments
+            - {data}
+                The raw data in bytes
+        """
+        pass
+
     async def send(self, target: str, data: bytes):
         """
             Executed when node wants to send raw data
