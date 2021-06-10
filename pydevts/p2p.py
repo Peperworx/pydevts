@@ -96,7 +96,7 @@ class P2PNode:
             "data": data
         }))
 
-    async def on(self, name: str, func: FunctionType):
+    def on(self, name: str, func: FunctionType):
         """
             Registers callback for event
         """
