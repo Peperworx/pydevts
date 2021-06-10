@@ -76,12 +76,12 @@ class P2PNode:
         # Log
         logger.info(f"Created listener at host 0.0.0.0:{self.listen_port}")
 
-    async def send(self, target: str, name: str, data: dict):
+    async def send(self, target: str, name: str, data: dict) -> Connection:
         """
             Sends an event to a specific target
         """
 
-        await self.router.send(target, msgpack.dumps({
+        return await self.router.send(target, msgpack.dumps({
             "name":name,
             "data":data
         }))
@@ -141,7 +141,7 @@ class P2PNode:
                     data = msgpack.loads(data["data"])
                     if data["name"] in self.callbacks.keys():
                         for v in self.callbacks[data["name"]]:
-                            await v(data["data"])
+                            await v(conn, data["data"])
         
         except anyio.EndOfStream:
             # Ignore EndOfStream
