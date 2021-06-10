@@ -44,6 +44,7 @@ class P2PNode:
         if entry == None:
             logger.info(f'Unable to connect to network through node {host}:{port}. Creating network')
             await self.run()
+            return
 
         self.entry = entry["entry"]
         entry = self.entry
