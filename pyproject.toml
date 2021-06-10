@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pydevts"
-version = "0.0.4"
+version = "0.1.0"
 description = "PYDEVTS (PYthon Distributed EVenT System) is a distributed event system written in python and based on the concept of nodes that is designed for the implementation of data stores and other replicated systems."
 authors = ["Riley Wilton <meetingprince34@outlook.com>"]
 readme = "README.md"

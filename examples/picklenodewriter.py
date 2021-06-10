@@ -3,9 +3,8 @@
     This file contains a node that simply writes to a file every time data is replicated
 """
 
-from pydevts import Node, Connection
+from pydevts import *
 
-import pickle
 import trio
 import sys
 import logging
