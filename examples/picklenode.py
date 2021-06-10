@@ -1,3 +1,4 @@
+
 """
     This example shows how you can implement a custom node type to store a pickled object
 """
@@ -11,7 +12,7 @@ import logging
 import base64
 
 class PickleNode(Node):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.stored = object
     
 
@@ -19,7 +20,7 @@ class PickleNode(Node):
         return self.stored
 
     async def set(self,v):
-        await self.conn.broadcast("on_replicate",{
+        await self.conn.emit("on_replicate",{
             "type":"picklenode",
             "value":base64.b64encode(pickle.dumps(v)).decode()
         })
@@ -68,7 +69,7 @@ class PickleNode(Node):
     #      Data Replication
     ##############################
 
-    async def on_replicate(self, request, data: dict):
+    async def on_replicate(self, data: dict):
         """
             Function called when data needs to be replicated
         """

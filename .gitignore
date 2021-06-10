@@ -138,4 +138,7 @@ dmypy.json
 cython_debug/
 
 
-settings.json
+.dist/**
+.vscode/**
+
+poetry.lock

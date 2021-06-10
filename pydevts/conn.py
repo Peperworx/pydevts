@@ -1,60 +1,62 @@
 """
-    This file contains connection wrapper classes
+    Provides a simple anyio TCP connection wrapper.
 """
-import trio
+import anyio
+from anyio._core._sockets import SocketStream
+import socket
+import msgpack
 import struct
-import json
 
 class Connection:
-    @classmethod
-    async def connect(cls, host, port):
-        conn = await trio.open_tcp_stream(
-            host, port
-        )
-        
-        return cls(conn)
+    wrapped: SocketStream
+    raw: socket.socket
+    host: str
+    port: int
 
-    def __init__(self, conn: trio.SocketStream):
-        self.conn = conn
+    def __init__(self, wraps: SocketStream):
+        self.wrapped = wraps
+        self.raw = self.wrapped._raw_socket
+        self.host = self.raw.getsockname()[0]
+        self.port = self.raw.getsockname()[1]
     
-    async def recv(self) -> dict:
-        """
-            Recieves dictionary data from the connection
-        """
-        offset = struct.calcsize("L")
-        recsize = await self.conn.receive_some(offset)
-        if len(recsize) < offset:
-            return {}
-        size = struct.unpack("L",recsize)[0]
-        data = (await self.conn.receive_some(size)).decode()
-        data = json.loads(data)
-        return data
+    @classmethod
+    async def connect(cls, host: str, port: int):
+        s = await anyio.connect_tcp(host, int(port))
+        return cls(s)
+    
+    def __aiter__(self):
+        return self
+    
+    async def __anext__(self):
+        return await self.recv()
+    
+
     
     async def send(self, data: dict):
         """
-            Sends JSON dictionary data over the connection
+            Sends dictionary data over the connection
         """
-        # Pack the data
-        packed = await self._pack(data)
+        await self._send(msgpack.dumps(data))
 
-        # Send the data
-        await self.conn.send_all(packed)
-    
-
-    
-    async def _pack(self, data: dict) -> bytes:
+    async def recv(self) -> dict:
         """
-            Packs a JSON dictionary into a message for sending over TCP
+            Receives dictionary data over the connection
         """
+        return msgpack.loads(await self._recv())
 
-        # Dump the json
-        data = json.dumps(data, separators=(',',':')).encode()
+    async def _send(self, data: bytes):
+        """
+            Sends raw data over the connection
+        """
+        data = struct.pack("L",len(data)) + data
+        await self.wrapped.send(data)
 
-        # Grab the length
-        data_len = len(data)
-
-        # Pack and return data
-        return struct.pack("L",data_len)+data
+    async def _recv(self) -> bytes:
+        """
+            Receives raw data over the connection
+        """
+        header = struct.unpack("L", await self.wrapped.receive(struct.calcsize("L")))
+        return await self.wrapped.receive(header[0])
     
     async def aclose(self):
-        return await self.conn.aclose()
+        return await self.wrapped.aclose()

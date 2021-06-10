@@ -3,9 +3,8 @@
     This file contains a node that simply writes to a file every time data is replicated
 """
 
-from pydevts import Node, Connection
+from pydevts import *
 
-import pickle
 import trio
 import sys
 import logging
@@ -13,12 +12,11 @@ import base64
 
 class PickleWriterNode(Node):
     
-    async def on_replicate(self, request, data: dict):
+    async def on_replicate(self, data: dict):
         if data.get("type") != "picklenode":
             return
-        fs = await trio.open_file("./pickleoutput.txt","a")
-        await fs.write(str(pickle.loads(base64.b64decode(data["value"]))))
-        await fs.write("\n")
+        fs = await trio.open_file("./pickleoutput.txt","wb+")
+        await fs.write(base64.b64decode(data["value"]))
         await fs.aclose()
 
 

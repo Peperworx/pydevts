@@ -4,7 +4,7 @@ PYDEVTS (Python Distributed EVenT System) is a distributed event system written 
 
 PYDEVTS is based upon a simple concept: A cluster of nodes that can send and recieve events.
 
-PYDEVTS is also lightweight, requiring only the external library [trio](https://github.com/python-trio/trio) although some examples may require additional libraries (these will be detailed in the examples description)
+PYDEVTS is also lightweight, requiring only [anyio](https://github.com/agronholm/anyio) although some examples may require additional libraries (these will be detailed in the examples description)
 
 
 ## How do I use this?
@@ -43,7 +43,7 @@ It takes two arguments:
 #### picklenode.py
 
 External Requirements:
-- None
+- trio (for the event loop)
 
 NOTICE: This should never be used with untrusted data, as pickle can be used to execute untrusted code.
 
@@ -56,7 +56,7 @@ This example takes two arguments:
 #### picklenodewriter.py
 
 External Requirements:
-- None
+- trio (for the event loop)
 
 NOTICE: This should never be used with untrusted data, as pickle can be used to execute untrusted code.
 

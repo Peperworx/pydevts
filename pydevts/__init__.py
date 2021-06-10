@@ -1,3 +1,2 @@
-from .node import *
-from .p2p import *
-from .conn import *
+from .conn import Connection
+from .node import Node, DBNode
