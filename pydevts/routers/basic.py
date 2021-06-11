@@ -36,8 +36,11 @@ class EKERouter(RouterBase):
                 Port of the entry node
         """
         
-        # Connect to the host
-        conn = await Connection.connect(host, port)
+        try:
+            # Connect to the host
+            conn = await Connection.connect(host, port)
+        except OSError:
+            return None
 
         # Generate and send request
         await conn.send(
@@ -90,14 +93,15 @@ class EKERouter(RouterBase):
         # Load peer list
         self.peers = cluster_info[4] + [entry]
 
-        
+        # Close connection
+        await conn.aclose()
 
         # Return entry
         return entry
     
     async def emit(self, data: bytes):
         """
-            Executed when a noad wants to broadcast raw data
+            Executed when a node wants to broadcast raw data
             Arguments
             - {data}
                 The raw data in bytes
@@ -107,7 +111,7 @@ class EKERouter(RouterBase):
             try:
                 
                 conn = await Connection.connect(p[1],p[2])
-                await conn.send(data)
+                await conn.send(struct.pack("!B",5)+data)
                 await conn.aclose()
 
             except OSError:
@@ -124,13 +128,20 @@ class EKERouter(RouterBase):
             - {data}
                 The raw data in bytes
         """
-
+        
+        if target == self.owner.nid:
+            conn = await Connection.connect("localhost",self.owner.listen_port)
+            
+            await conn.send(struct.pack("!B",5)+data)
+            
+            return conn
         
         for p in self.peers.copy():
             try:
+                print(p, target)
                 if p[0] == target:
                     conn = await Connection.connect(p[1],p[2])
-                    await conn.send(data)
+                    await conn.send(struct.pack("!B",5)+data)
                     return conn
 
             except OSError:
@@ -218,6 +229,11 @@ class EKERouter(RouterBase):
             return {
                 "type":"new_node",
                 "data":data
+            }
+        elif msg_type == 5:
+            return {
+                "type":"data",
+                "body":data
             }
         return {
             "type":"no-info"

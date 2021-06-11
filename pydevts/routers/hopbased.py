@@ -1,5 +1,8 @@
 """
-    Simple implementation of the hop based router system.
+    Hop based everyone knows everyone system.
+    This is really scalable, and works best with chains of nodes.
+
+    We will be using alot of concepts from basic EKERouter
 """
 
 from typing import Optional
@@ -12,7 +15,10 @@ class HopBasedRouter(RouterBase):
     def __init__(self, owner, **router_config):
         self.owner = owner
         self.config = router_config
-        self.peers = []
+
+        # These are different.
+        self.peers = [] # Peers are immediate neighbors
+        self.nodes = [] # Nodes are everyone on the network
     
     
     async def connect_to(self, host: str, port: int):

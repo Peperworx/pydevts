@@ -36,13 +36,13 @@ class Connection:
         """
             Sends dictionary data over the connection
         """
-        await self._send(msgpack.dumps(data))
+        await self.send(msgpack.dumps(data))
 
     async def urecv(self) -> dict:
         """
             Receives dictionary data over the connection
         """
-        return msgpack.loads(await self._recv())
+        return msgpack.loads(await self.recv())
 
     async def send(self, data: bytes):
         """

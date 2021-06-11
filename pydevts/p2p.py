@@ -86,11 +86,11 @@ class P2PNode:
         """
             Sends an event to a specific target
         """
-
-        return await self.router.send(target, msgpack.dumps({
+        conn = await self.router.send(target, msgpack.dumps({
             "name":name,
             "data":data
         }))
+        return conn
     
     async def emit(self, name: str, data: dict):
         """
@@ -140,7 +140,14 @@ class P2PNode:
                 if data["type"] in ["node_join","new_node"]:
                     dat = data["data"]
                     logger.info(f'Node {dat[0]}@{dat[2]}:{dat[3]} has joined via node {dat[3]}')
-        
+                elif data["type"] == "data":
+
+                    dat = msgpack.loads(data["body"])
+                    print(dat)
+                    if dat["name"] in self.callbacks.keys():
+                        for v in self.callbacks[dat["name"]]:
+                            await v(conn,dat["data"])
         except anyio.EndOfStream:
             # Ignore EndOfStream
             logger.debug(f"{conn.host}:{conn.port} disconnected")
+        
