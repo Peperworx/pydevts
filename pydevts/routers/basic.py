@@ -16,6 +16,7 @@ class EKERouter(RouterBase):
     """
         Basic implementation of "Everyone knows Everyone" routing system as described in pydevts/routers/README.md
     """
+    peers: list
 
     def __init__(self, owner, **router_config):
         self.owner = owner
@@ -80,7 +81,19 @@ class EKERouter(RouterBase):
 
         cluster_info = msgpack.loads(data)
 
-        print(cluster_info)
+        entry = (
+            entry[0],  # Entry nid
+            conn.host, # Entry host
+            entry[1],  # Entry port
+        )
+
+        # Load peer list
+        self.peers = cluster_info[4] + [entry]
+
+        
+
+        # Return entry
+        return entry
     
     async def emit(self, data: bytes):
         """
@@ -90,7 +103,15 @@ class EKERouter(RouterBase):
                 The raw data in bytes
         """
 
-        pass
+        for p in self.peers.copy():
+            try:
+                
+                conn = await Connection.connect(p[1],p[2])
+                await conn.send(data)
+                await conn.aclose()
+
+            except OSError:
+                self.peers.remove(p)
     
     
         
@@ -104,9 +125,18 @@ class EKERouter(RouterBase):
                 The raw data in bytes
         """
 
-        pass
-
         
+        for p in self.peers.copy():
+            try:
+                if p[0] == target:
+                    conn = await Connection.connect(p[1],p[2])
+                    await conn.send(data)
+                    return conn
+
+            except OSError:
+                self.peers.remove(p)
+
+    
     
     async def receive(self, conn: Connection) -> Optional[bytes]:
         """
@@ -146,13 +176,14 @@ class EKERouter(RouterBase):
             # Generate info
             newinfo = (
                 str(uuid.uuid4()),   # Generate new nid
-                self.peers,     # Our peers
                 conn.host,      # The node host
-                data[0],
+                data[0],        # The node Port
                 self.owner.nid, # The entry node
+                self.peers,     # Our peers
             )
             dat = msgpack.dumps(newinfo)
-
+            dat2 = msgpack.dumps(newinfo[:4])
+            
             # Send info
             await conn.send(
                 struct.pack("!B",4)+
@@ -167,23 +198,23 @@ class EKERouter(RouterBase):
                 await c.send(
                     struct.pack("!B",4)+
                     struct.pack("!L",len(dat))+
-                    dat
+                    dat2
                 )
                 await c.aclose()
             
             # Add to peers
-            self.peers.append(newinfo)
-
+            self.peers.append(newinfo[:4])
+            print(self.peers)
             return {
                 "type":"node_join",
-                "data":newinfo
+                "data":newinfo[:4]
             }
         elif msg_type == 4: # If it is a new node, add
             msg_size = struct.unpack("!L",data[:struct.calcsize("!L")])[0]
             data = data[struct.calcsize("!L"):]
 
             data = msgpack.loads(data[:msg_size])
-            self.peers.append(data)
+            self.peers.append(data[:3])
             return {
                 "type":"new_node",
                 "data":data

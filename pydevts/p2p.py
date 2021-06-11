@@ -46,9 +46,8 @@ class P2PNode:
             await self.run()
             return
 
-        self.entry = entry["entry"]
-        entry = self.entry
-        logger.info(f'Connected to network through entry node {entry["nid"]}@{entry["host"]}:{entry["port"]}/{entry["cliport"]}')
+        self.entry = entry
+        logger.info(f'Connected to network through entry node {entry[0]}@{entry[1]}:{entry[2]}')
 
         await self.run()
 
@@ -138,9 +137,9 @@ class P2PNode:
                 
                 data = await self.router.receive(conn)
                 
-                if data["type"] == "node_join":
+                if data["type"] in ["node_join","new_node"]:
                     dat = data["data"]
-                    logger.info(f'Node {dat[0]}@{dat[2]}:{dat[3]} has joined via node {dat[4]}')
+                    logger.info(f'Node {dat[0]}@{dat[2]}:{dat[3]} has joined via node {dat[3]}')
         
         except anyio.EndOfStream:
             # Ignore EndOfStream
