@@ -32,26 +32,26 @@ class Connection:
     
 
     
-    async def send(self, data: dict):
+    async def usend(self, data: dict):
         """
             Sends dictionary data over the connection
         """
         await self._send(msgpack.dumps(data))
 
-    async def recv(self) -> dict:
+    async def urecv(self) -> dict:
         """
             Receives dictionary data over the connection
         """
         return msgpack.loads(await self._recv())
 
-    async def _send(self, data: bytes):
+    async def send(self, data: bytes):
         """
             Sends raw data over the connection
         """
         data = struct.pack("L",len(data)) + data
         await self.wrapped.send(data)
 
-    async def _recv(self) -> bytes:
+    async def recv(self) -> bytes:
         """
             Receives raw data over the connection
         """

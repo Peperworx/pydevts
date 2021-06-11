@@ -1,5 +1,5 @@
 from typing import Optional
-
+from pydevts import Connection
 
 class RouterBase:
 
@@ -42,12 +42,12 @@ class RouterBase:
         """
         pass
 
-    async def receive(self, data: bytes) -> Optional[bytes]:
+    async def receive(self, conn: Connection) -> Optional[bytes]:
         """
             Executed when raw data is received
             Arguments
-            - {data}
-                The raw data in bytes
+            - {conn}
+                The Connection Object
         """
         pass
     
