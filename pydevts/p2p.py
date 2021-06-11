@@ -138,20 +138,9 @@ class P2PNode:
                 
                 data = await self.router.receive(conn)
                 
-                if data["type"] == "peer_connect":
-                    logger.info(f'Peer {data["nid"]}@{data["host"]}:{data["port"]}/{data["cliport"]} is connecting through this node')
-                elif data["type"] == "peer_join":
-                    logger.info(f'Peer {data["nid"]}@{data["host"]}:{data["port"]}/{data["cliport"]} has joind through entry node {data["entry"]}')
-                elif data["type"] == "ping":
-                    pass
-                elif data["type"] == "data":
-                    dat = msgpack.loads(data["body"])
-                    if dat["name"] in self.callbacks.keys():
-                        for v in self.callbacks[dat["name"]]:
-                            if data["bcast"]:
-                                await v(dat["data"])
-                            else:
-                                await v(conn, dat["data"])
+                if data["type"] == "node_join":
+                    dat = data["data"]
+                    logger.info(f'Node {dat[0]}@{dat[2]}:{dat[3]} has joined via node {dat[4]}')
         
         except anyio.EndOfStream:
             # Ignore EndOfStream
