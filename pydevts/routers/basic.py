@@ -44,7 +44,7 @@ class EKERouter(RouterBase):
 
         # Generate and send request
         await conn.send(
-            struct.pack("B",1) # 1 is info request
+            struct.pack("!B",1) # 1 is info request
         )
 
         # Receive response
@@ -166,7 +166,7 @@ class EKERouter(RouterBase):
 
         # If it is a ping, respond with ping
         if msg_type == 0:
-            await conn.send(struct.pack("B",0))
+            await conn.send(struct.pack("!B",0))
         elif msg_type == 1: # If it is a info request, respond with info
             
             dat = msgpack.dumps((
