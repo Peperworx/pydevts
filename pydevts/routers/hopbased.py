@@ -8,6 +8,9 @@
 from typing import Optional
 from pydevts.routers._base import RouterBase
 from pydevts import Connection
+import struct
+import msgpack
+import uuid
 
 class HopBasedRouter(RouterBase):
 
@@ -21,7 +24,7 @@ class HopBasedRouter(RouterBase):
         # These are different.
         self.peers = [] # Peers are immediate neighbors
         self.nodes = {} # Nodes are everyone on the network
-    
+        self.entry = None # The entry node
     
     async def connect_to(self, host: str, port: int):
         """
@@ -34,7 +37,7 @@ class HopBasedRouter(RouterBase):
         """
         try:
             # Connect to entry node
-            conn = Connection.connect(host, port)
+            conn = await Connection.connect(host, port)
         except OSError:
             return None
 
@@ -46,7 +49,79 @@ class HopBasedRouter(RouterBase):
         # Receive response
         data = await conn.recv()
 
-        print(data)
+        # Unpack the message type
+        msg_type = struct.unpack("!B",data[:struct.calcsize("!B")])[0]
+        data = data[struct.calcsize("!B"):]
+
+        # If not a response, return none
+        if msg_type != 2:
+            return None
+        
+        # Load Message size
+        msg_size = struct.unpack("!L",data[:struct.calcsize("!L")])[0]
+        data = data[struct.calcsize("!L"):]
+
+        # Load entry node data
+        entry = msgpack.loads(data[:msg_size])
+
+
+        # Set entry node info
+        entry = (
+            entry[0],   # Entry nid
+            conn.host,  # Entry host
+            entry[1],   # Entry port
+            entry[2],   # Entry entry
+            entry[3],   # Entry peers
+        )
+
+        # Add entry to list of peers
+        self.peers += [entry]
+
+        # Request entry notify
+        # TODO: Auth here
+
+        dat = msgpack.dumps((
+            self.owner.listen_port,
+            [p[0] for p in self.peers]
+        ))
+        await conn.send(
+            struct.pack("!B",3)+
+            struct.pack("!L",len(dat))+
+            dat)
+
+        # Receive response
+        data = await conn.recv()
+
+        # Unpack the message type
+        msg_type = struct.unpack("!B",data[:struct.calcsize("!B")])[0]
+        data = data[struct.calcsize("!B"):]
+
+        # If not a response, return none
+        if msg_type != 4:
+            return None
+        
+        # Load Message size
+        msg_size = struct.unpack("!L",data[:struct.calcsize("!L")])[0]
+        data = data[struct.calcsize("!L"):]
+
+        # Load message
+        info = msgpack.loads(data[:msg_size])
+
+        # Update our info
+        self.owner.nid = info[0]
+
+        # Set our entry node
+        self.entry = info[3]
+        
+        # Set the peers of our entry node
+        self.nodes[entry[0]] = set([e[0] for e in entry[4]])
+        
+
+        # Return entry info
+        return entry
+
+
+
     
     async def emit(self, data: bytes):
         """
@@ -68,7 +143,7 @@ class HopBasedRouter(RouterBase):
         """
         pass
 
-    async def receive(self, data: bytes) -> Optional[bytes]:
+    async def receive(self, conn: Connection) -> Optional[bytes]:
         """
             Executed when raw data is received
             Arguments
@@ -83,6 +158,7 @@ class HopBasedRouter(RouterBase):
         msg_type = struct.unpack("!B",data[:struct.calcsize("!B")])[0]
         data = data[struct.calcsize("!B"):]
 
+        
         # If it is ping, respond with ping
         if msg_type == 0:
             await conn.send(struct.pack("!B",0))
@@ -90,6 +166,8 @@ class HopBasedRouter(RouterBase):
             dat = msgpack.dumps((
                 self.owner.nid, # Node ID
                 self.owner.listen_port, # Listen Port
+                self.entry if self.entry else self.owner.nid, # Our entry node
+                self.peers, # Peers
             ))
             resp = struct.pack("!B",2)
             resp += struct.pack("!L",len(dat))
@@ -108,6 +186,7 @@ class HopBasedRouter(RouterBase):
                 conn.host,      # The node host
                 data[0],        # The node Port
                 self.owner.nid, # The entry node
+                data[1],        # The peers of the new node
             )
 
             dat = msgpack.dumps(newinfo)
@@ -119,11 +198,40 @@ class HopBasedRouter(RouterBase):
                 dat
             )
 
+            # Copy peer list
+            pc = self.peers.copy()
+
+            # Add to peers
+            self.peers += [newinfo]
+
+            # Add to nodes
+            self.nodes[newinfo[0]] = set(newinfo[4])
+
             # Iterate over peers, sending to each
-            for p in self.peers:
-                c = await Connection.connect(p[2],p[3])
+            for p in pc:
+                c = await Connection.connect(p[1],p[2])
                 await c.send(
-                    struct.pack("!B",4)
+                    struct.pack("!B",5)+
+                    struct.pack("!L",len(dat))+
+                    dat
                 )
+        elif msg_type == 5:
+            msg_size = struct.unpack("!L",data[:struct.calcsize("!L")])[0]
+            data = data[struct.calcsize("!L"):]
+
+            data = msgpack.loads(data[:msg_size])
+            
+            # Now we have, in data, a peer that one of our friends knows
+            print(data)
+
+            # Add the node to the entry node
+            self.nodes[data[3]] += [data[0]]
+
+            # Add the node to nodes
+            self.nodes[data[0]] = set(data[4])
+
+            # Done!
+        print(self.nodes)
+        return {"type":"no_info"}
     
 

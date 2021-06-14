@@ -4,7 +4,7 @@ from anyio.abc._sockets import SocketStream
 import anyio
 from loguru import logger
 from .conn import Connection
-from .routers.basic import EKERouter
+from .routers.hopbased import HopBasedRouter
 from . import errors
 import msgpack
 from types import FunctionType
@@ -18,7 +18,7 @@ class P2PNode:
     nid: str # The node ID of this node
     server: MultiListener # The anyio server listener
     listen_port: int # The port to listen on
-    router: EKERouter
+    router: HopBasedRouter
     callbacks: dict[str, list[FunctionType]]
     entry: dict # The entry node
 
@@ -27,7 +27,7 @@ class P2PNode:
             A basic multi peer peer to peer node.
         """
         self.nid = str(uuid.uuid4())
-        self.router = EKERouter(self)
+        self.router = HopBasedRouter(self)
         self.callbacks = {}
 
     async def join(self,host: str,port: int):
