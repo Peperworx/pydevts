@@ -85,7 +85,7 @@ This version provides theoretical support for multiple routing systems, although
 
 ### 0.2.z
 
-This is where things start to get interesting. From versions 0.0.z and 0.1.z we now know the basics about how the system will function when finished. In this version we will start creating standard API interfaces and protocols for routing systems to use. This version will also implement QUIC as well as TCP to reduce overhead produced when connecting to peers.
+This is where things start to get interesting. From versions 0.0.z and 0.1.z we now know the basics about how the system will function when finished. In this version we will start creating standard API interfaces and protocols for routing systems to use. This version will also implement QUIC as well as TCP to reduce overhead produced when connecting to peers, and use other external libraries to provide more extensive support for different routing methods.
 
 ### 0.3.z
 
