@@ -113,9 +113,12 @@ class HopBasedRouter(RouterBase):
         # Set our entry node
         self.entry = info[3]
         
+        # Set our node dict
+        self.nodes ={k:set(v) for k,v in info[5].items()}
+
         # Set the peers of our entry node
         self.nodes[entry[0]] = set([e[0] for e in entry[4]])
-        
+        print(self.nodes)
 
         # Return entry info
         return entry
@@ -180,6 +183,8 @@ class HopBasedRouter(RouterBase):
 
             data = msgpack.loads(data[:msg_size])
 
+            ng = {k:list(v) for k,v in self.nodes.items()}
+
             # Generate info
             newinfo = (
                 str(uuid.uuid4()),   # Generate new nid
@@ -187,10 +192,12 @@ class HopBasedRouter(RouterBase):
                 data[0],        # The node Port
                 self.owner.nid, # The entry node
                 data[1],        # The peers of the new node
+                ng              # The network graph
             )
 
             dat = msgpack.dumps(newinfo)
-
+            dat2 = msgpack.dumps(newinfo[:5])
+            
             # Send info
             await conn.send(
                 struct.pack("!B", 4)+
@@ -212,8 +219,8 @@ class HopBasedRouter(RouterBase):
                 c = await Connection.connect(p[1],p[2])
                 await c.send(
                     struct.pack("!B",5)+
-                    struct.pack("!L",len(dat))+
-                    dat
+                    struct.pack("!L",len(dat2))+
+                    dat2
                 )
         elif msg_type == 5:
             msg_size = struct.unpack("!L",data[:struct.calcsize("!L")])[0]
@@ -225,12 +232,13 @@ class HopBasedRouter(RouterBase):
             print(data)
 
             # Add the node to the entry node
-            self.nodes[data[3]] += [data[0]]
+            self.nodes[data[3]] |= {data[0],}
 
             # Add the node to nodes
             self.nodes[data[0]] = set(data[4])
 
             # Done!
+
         print(self.nodes)
         return {"type":"no_info"}
     

@@ -204,7 +204,7 @@ class EKERouter(RouterBase):
 
             # Iterate over peers, sending to each
             for p in self.peers:
-                c = await Connection.connect(p[1],p[2])
+                c = await Connection.connect(p[1],p[])
                 # Tell peer that we have a new node
                 await c.send(
                     struct.pack("!B",4)+
