@@ -103,6 +103,9 @@ This version will focus on security and hardening the system against denial of s
 
 These versions are yet to be determined, and will most likely be used in the event of an occurring issue or feature that I have not yet thought of, or do not fit into the other versions. These versions will be filled in here as needed.
 
+### 1.y.z and up
+
+These versions are the first stable versions and will follow the semver versioning system. These will mainly be bugfixes and new features.
 ## Collaboration and Questions
 
 If you find a bug, report it on github issues. If, however, you have questions or are not sure how something works, post it on github discussions.
