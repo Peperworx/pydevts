@@ -86,7 +86,7 @@ class Node(metaclass=AsyncCustomInitMeta):
     ##############################
 
 
-    async def on_replicate(self, data: dict):
+    async def on_replicate(self, conn: Connection, data: dict):
         """
             Function called when data needs to be replicated
         """
@@ -151,7 +151,7 @@ class DBNode(Node):
     #      Data Replication
     ##############################
 
-    async def on_replicate(self, data: dict):
+    async def on_replicate(self, conn: Connection, data: dict):
         """
             Function called when data needs to be replicated
         """

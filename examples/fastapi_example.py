@@ -1,10 +1,12 @@
 import asyncio
+import sys, os
+sys.path.insert(0,os.path.dirname(os.path.dirname(__file__)))
 from pydevts.node import *
 from fastapi import FastAPI
 from hypercorn.asyncio import serve
 from hypercorn.config import Config
 import logging
-import sys
+
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -15,7 +17,8 @@ app = FastAPI()
 @app.get("/")
 async def index():
     conn = await n.send(n.conn.nid,"test_event","hello, world!")
-    data = await conn.recv()
+    
+    data = await conn.urecv()
     print(data)
     await n.emit("test_broadcast",data)
 
@@ -30,13 +33,14 @@ async def set(name: str, value: str):
 
 @n.on("test_event")
 async def test_event(conn, data):
-    await conn.send({
+    print(data)
+    await conn.usend({
         "message":"test",
         "data":data
     })
 
 @n.on("test_broadcast")
-async def test_broadcast(data):
+async def test_broadcast(conn, data):
     print("From Broadcast")
     print(data)
     

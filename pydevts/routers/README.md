@@ -26,8 +26,11 @@ Cons:
 - Not as easy to implement as the previous system
 - Limits the size of the network (nothing further than x hops)
 - Adds overhead and strain on unrelated parts of the network
+- Message duplication
 
 Hop-based systems are much more scalable than the previous system. This system is capable of reliably sending messages between networks in the afore-mentioned scenario. This system also has some overhead when sending messages, but not enough to be noticeable. This system is still simple enough to implement but may have slightly more complex code.
+
+The largest downside is message duplication. Multiple versions of the same message *will* reach the target. This makes it no suitable for most applications.
 
 ## Pathfinding
 

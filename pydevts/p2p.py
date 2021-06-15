@@ -4,7 +4,7 @@ from anyio.abc._sockets import SocketStream
 import anyio
 from loguru import logger
 from .conn import Connection
-from .routers.basic import EKERouter
+from .routers.hopbased import HopBasedRouter
 from . import errors
 import msgpack
 from types import FunctionType
@@ -18,7 +18,7 @@ class P2PNode:
     nid: str # The node ID of this node
     server: MultiListener # The anyio server listener
     listen_port: int # The port to listen on
-    router: EKERouter
+    router: HopBasedRouter
     callbacks: dict[str, list[FunctionType]]
     entry: dict # The entry node
 
@@ -27,7 +27,7 @@ class P2PNode:
             A basic multi peer peer to peer node.
         """
         self.nid = str(uuid.uuid4())
-        self.router = EKERouter(self)
+        self.router = HopBasedRouter(self)
         self.callbacks = {}
 
     async def join(self,host: str,port: int):
@@ -44,10 +44,10 @@ class P2PNode:
         if entry == None:
             logger.info(f'Unable to connect to network through node {host}:{port}. Creating network')
             await self.run()
+            return
 
-        self.entry = entry["entry"]
-        entry = self.entry
-        logger.info(f'Connected to network through entry node {entry["nid"]}@{entry["host"]}:{entry["port"]}/{entry["cliport"]}')
+        self.entry = entry
+        logger.info(f'Connected to network through entry node {entry[0]}@{entry[1]}:{entry[2]}')
 
         await self.run()
 
@@ -86,11 +86,11 @@ class P2PNode:
         """
             Sends an event to a specific target
         """
-
-        return await self.router.send(target, msgpack.dumps({
+        conn = await self.router.send(target, msgpack.dumps({
             "name":name,
             "data":data
         }))
+        return conn
     
     async def emit(self, name: str, data: dict):
         """
@@ -137,21 +137,17 @@ class P2PNode:
                 
                 data = await self.router.receive(conn)
                 
-                if data["type"] == "peer_connect":
-                    logger.info(f'Peer {data["nid"]}@{data["host"]}:{data["port"]}/{data["cliport"]} is connecting through this node')
-                elif data["type"] == "peer_join":
-                    logger.info(f'Peer {data["nid"]}@{data["host"]}:{data["port"]}/{data["cliport"]} has joind through entry node {data["entry"]}')
-                elif data["type"] == "ping":
-                    pass
+                if data["type"] in ["node_join","new_node"]:
+                    dat = data["data"]
+                    logger.info(f'Node {dat[0]}@{dat[2]}:{dat[3]} has joined via node {dat[3]}')
                 elif data["type"] == "data":
+
                     dat = msgpack.loads(data["body"])
+                    print(dat)
                     if dat["name"] in self.callbacks.keys():
                         for v in self.callbacks[dat["name"]]:
-                            if data["bcast"]:
-                                await v(dat["data"])
-                            else:
-                                await v(conn, dat["data"])
-        
+                            await v(conn,dat["data"])
         except anyio.EndOfStream:
             # Ignore EndOfStream
             logger.debug(f"{conn.host}:{conn.port} disconnected")
+        

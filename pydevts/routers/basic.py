@@ -7,17 +7,22 @@ from ._base import RouterBase
 from typing import Optional
 from pydevts.conn import Connection
 import socket
+import struct
 import uuid
 import anyio
+import msgpack
 
 class EKERouter(RouterBase):
     """
         Basic implementation of "Everyone knows Everyone" routing system as described in pydevts/routers/README.md
     """
+    peers: list
 
     def __init__(self, owner, **router_config):
         self.owner = owner
         self.config = router_config
+
+        # Initialize list of our peers
         self.peers = []
     
     
@@ -32,87 +37,87 @@ class EKERouter(RouterBase):
         """
         
         try:
-            conn = await Connection.connect(host,port)
+            # Connect to the host
+            conn = await Connection.connect(host, port)
         except OSError:
-            
             return None
-        await conn.send({
-            "type":"peer_connect",
-            "port": self.owner.listen_port,
 
-        })
-        
-        
-        
+        # Generate and send request
+        await conn.send(
+            struct.pack("!B",1) # 1 is info request
+        )
+
+        # Receive response
         data = await conn.recv()
         
+        # Unpack type
+        msg_type = struct.unpack("!B",data[:struct.calcsize("!B")])[0]
+        data = data[struct.calcsize("!B"):]
+        print(msg_type)
+        if msg_type != 2:
+            # If it is not a response, then return None
+            return None
+        msg_size = struct.unpack("!L",data[:struct.calcsize("!L")])[0]
+        data = data[struct.calcsize("!L"):]
+        entry = msgpack.loads(data[:msg_size])
         
-        if data["type"] == "ack_connect":
-            self.owner.nid = data["nid"]
-            self.peers = [(data["entry_nid"],host,port,conn.port)] + data["peers"]
-        else:
-            raise RuntimeError("Unexpected response")
+        print(entry)
+        # If it is, request to join
+        dat = msgpack.dumps((
+            self.owner.listen_port,
+        ))
+        await conn.send(
+            struct.pack("!B",3)+
+            struct.pack("!L",len(dat))+
+            dat)
         
-        await self._cleanup()
-        
+        # Await info
+        data = await conn.recv()
+        msg_type = struct.unpack("!B",data[:struct.calcsize("!B")])[0]
+        data = data[struct.calcsize("!B"):]
+        if msg_type != 4:
+            # If it is not a response, then return None
+            return None
+        msg_size = struct.unpack("!L",data[:struct.calcsize("!L")])[0]
+        data = data[struct.calcsize("!L"):]
 
-        return {
-            "entry":{
-                "nid": data["entry_nid"],
-                "host": conn.host,
-                "port": port,
-                "cliport": conn.port,
-            }
-        }
+
+        cluster_info = msgpack.loads(data)
+
+        entry = (
+            entry[0],  # Entry nid
+            conn.host, # Entry host
+            entry[1],  # Entry port
+        )
+
+        # Load peer list
+        self.peers = cluster_info[4] + [entry]
+
+        # Close connection
+        await conn.aclose()
+
+        # Return entry
+        return entry
     
     async def emit(self, data: bytes):
         """
-            Executed when a noad wants to broadcast raw data
+            Executed when a node wants to broadcast raw data
             Arguments
             - {data}
                 The raw data in bytes
         """
-        rmp = []
-        for p in self.peers:
+
+        for p in self.peers.copy():
             try:
+                
                 conn = await Connection.connect(p[1],p[2])
-                await conn.send({"type":"data","bcast":True,"body":data})
+                await conn.send(struct.pack("!B",5)+data)
                 await conn.aclose()
+
             except OSError:
-                rmp += [p]
-        [self.peers.remove(p) for p in rmp]
-
-        
-
-
+                self.peers.remove(p)
     
-    async def _send(self, target: str, data: dict) -> Connection:
-        rmp = []
-        for p in self.peers:
-            try:
-                if p[0] == target:
-                    conn = await Connection.connect(p[1],p[2])
-                    await conn.send(data)
-                    return conn
-            except OSError:
-                rmp += [p]
-        [self.peers.remove(p) for p in rmp]
     
-    async def _cleanup(self):
-        """
-            Iterates over each peer, cleaning up those that are no longer online
-        """
-        rmp = []
-        for p in self.peers:
-            try:
-                conn = await Connection.connect(p[1],p[2])
-
-                await conn.send({"type":"ping"})
-
-                await conn.aclose()
-            except OSError:
-                rmp += [p]
-        [self.peers.remove(p) for p in rmp]
         
     async def send(self, target: str, data: bytes) -> Connection:
         """
@@ -123,80 +128,115 @@ class EKERouter(RouterBase):
             - {data}
                 The raw data in bytes
         """
-
+        
         if target == self.owner.nid:
-            conn = await Connection.connect("localhost", self.owner.listen_port)
-            await conn.send({"type":"data","bcast":False,"body":data})
+            conn = await Connection.connect("localhost",self.owner.listen_port)
+            
+            await conn.send(struct.pack("!B",5)+data)
+            
             return conn
-        rmp = []
-        for p in self.peers:
+        
+        for p in self.peers.copy():
             try:
+                print(p, target)
                 if p[0] == target:
                     conn = await Connection.connect(p[1],p[2])
-                    await conn.send({"type":"data","bcast":False,"body":data})
+                    await conn.send(struct.pack("!B",5)+data)
                     return conn
-            except OSError:
-                rmp += [p]
-        [self.peers.remove(p) for p in rmp]
 
-        
+            except OSError:
+                self.peers.remove(p)
+
+    
     
     async def receive(self, conn: Connection) -> Optional[bytes]:
         """
             Executed when raw data is received
             Arguments
-            - {data}
-                The raw data in bytes
+            - {conn}
+                The connection object
         """
         
+        # Receive data
         data = await conn.recv()
 
-        if data["type"] == "peer_connect":
-            nid = str(uuid.uuid4())
+        # Unpack type
+        msg_type = struct.unpack("!B",data[:struct.calcsize("!B")])[0]
+        data = data[struct.calcsize("!B"):]
 
-            await conn.send({
-                "type":"ack_connect",
-                "nid": nid,
-                "entry_nid": self.owner.nid,
-                "peers":self.peers
-            })
-            rmp = []
-            for peer in self.peers:
-                try:
-                    conn = await Connection.connect(peer[1],peer[2])
-                    await conn.send({
-                        "type": "peer_join",
-                        "nid": nid,
-                        "host": conn.host,
-                        "port": data["port"],
-                        "entry": self.owner.nid,
-                        "cliport": conn.port,
-                    })
-                    await conn.aclose()
-                except OSError:
-                    rmp += [peer]
-            [self.peers.remove(i) for i in rmp]
-
-            self.peers.append((nid,conn.host,data["port"],conn.port))
-
-            await self._cleanup()
-
+        # If it is a ping, respond with ping
+        if msg_type == 0:
+            await conn.send(struct.pack("!B",0))
+        elif msg_type == 1: # If it is a info request, respond with info
             
-            data["nid"] = nid
-            data["host"] = conn.host
-            data["cliport"] = conn.port
-            return data
-        elif data["type"] == "peer_join":
-            self.peers.append((
-                data["nid"],
-                conn.host,
-                data["port"],
-                data["cliport"]
+            dat = msgpack.dumps((
+                self.owner.nid, # Node ID
+                self.owner.listen_port, # Listen Port
             ))
+            resp = struct.pack("!B",2)
+            resp += struct.pack("!L",len(dat))
+            resp += dat
+            await conn.send(resp)
+        elif msg_type == 3: # If it is a request to join, accept
+            # TODO: Auth here
+            msg_size = struct.unpack("!L",data[:struct.calcsize("!L")])[0]
+            data = data[struct.calcsize("!L"):]
 
-            await self._cleanup()
+            data = msgpack.loads(data[:msg_size])
             
+            # Generate info
+            newinfo = (
+                str(uuid.uuid4()),   # Generate new nid
+                conn.host,      # The node host
+                data[0],        # The node Port
+                self.owner.nid, # The entry node
+                self.peers,     # Our peers
+            )
+            dat = msgpack.dumps(newinfo)
+            dat2 = msgpack.dumps(newinfo[:4])
             
-            return data
-        return data
+            # Send info
+            await conn.send(
+                struct.pack("!B",4)+
+                struct.pack("!L",len(dat))+
+                dat
+            )
+
+            # Iterate over peers, sending to each
+            for p in self.peers:
+                c = await Connection.connect(p[1],p[])
+                # Tell peer that we have a new node
+                await c.send(
+                    struct.pack("!B",4)+
+                    struct.pack("!L",len(dat))+
+                    dat2
+                )
+                await c.aclose()
+            
+            # Add to peers
+            self.peers.append(newinfo[:4])
+            print(self.peers)
+            return {
+                "type":"node_join",
+                "data":newinfo[:4]
+            }
+        elif msg_type == 4: # If it is a new node, add
+            msg_size = struct.unpack("!L",data[:struct.calcsize("!L")])[0]
+            data = data[struct.calcsize("!L"):]
+
+            data = msgpack.loads(data[:msg_size])
+            self.peers.append(data[:3])
+            return {
+                "type":"new_node",
+                "data":data
+            }
+        elif msg_type == 5:
+            return {
+                "type":"data",
+                "body":data
+            }
+        return {
+            "type":"no-info"
+        }
+
             
