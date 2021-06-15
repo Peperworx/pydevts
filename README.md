@@ -95,7 +95,11 @@ This version will restructure the project to make the Routing Systems, Protocols
 
 This version is an API refractor. This focuses mainly on how nodes work (combining nodes, removing unneeded methods, etc.), and will allow users to provide custom data serialization methods. The goal of this version is to make the library as ergonomic as possible, whilst adding customization that was not included in 0.3.z.
 
-### 0.5.z and up
+### 0.5.z
+
+This version will focus on security and hardening the system against denial of service attacks and similar attacks. A patch version of this version will also provide support for plugins that allow certain aspects of the system to be changed (e.x: load balancing connections), or to perform operations (like analytics) on received or sent data. This plugin system works at the connection level, and not at the node level like custom nodes do.
+
+### 0.6.z and up
 
 These versions are yet to be determined, and will most likely be used in the event of an occurring issue or feature that I have not yet thought of, or do not fit into the other versions. These versions will be filled in here as needed.
 
