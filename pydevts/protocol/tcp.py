@@ -43,7 +43,7 @@ class TCPTransport(PYDEVTSTransport):
         Basic TCP transport implementation
     """
 
-    async def connect(self, host: str, port: int = None) -> "TCPConnection":
+    async def connect(cls, host: str, port: int = None) -> "TCPConnection":
         """
             Connects to host:port and returns connection
         """

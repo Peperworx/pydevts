@@ -1,14 +1,12 @@
-from pydevts.protocol.quic import *
+from pydevts.protocol.tcp import *
 import trio
 import sys
 
 
 
 async def main():
-    client = await QUICTransport().connect("google.com",sys.argv[1])
-    await client.send(bytes("""GET / HTTP/3\r\n\r\n""".encode()))
-    data = await client.recv(0)
-    print(data)
+    client = await TCPTransport().connect("localhost",sys.argv[1])
+    await client.send(bytes(sys.argv[2].encode()))
 
 if __name__ == '__main__':
     trio.run(main)

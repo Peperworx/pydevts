@@ -35,21 +35,21 @@ class QUICConnection(PYDEVTSConnection):
         self.timer_for = time.time() + 5
         
         # Run handler
-        await anyio.to_thread.run_sync(self._wait_sync,cancellable=True)
-        print("hi")
+        tg = anyio.create_task_group()
+        await tg.__aenter__()
+        tg.start_soon(self._wait_sync)
+        print("yo")
         # QUIC connect
         self.wrapped.connect(
             (self.owner.host,self.owner.port,),
             time.time()
         )
-
+        await tg.__aexit__(None, None, None)
         # Handle datagrams
         await self._handle_systems()
     
-    def _wait_sync(self):
-        while time.time() < self.timer_for:
-            time.sleep(1)
-        anyio.from_thread.run_async_from_thread(self.cont)
+    async def _wait_sync(self):
+        await anyio.sleep(20)
 
     async def _handle_systems(self):
         """
@@ -131,7 +131,7 @@ class QUICTransport(PYDEVTSConnection):
         # Wrap
         conn = QUICConnection()
         await conn.connect(connection, self)
-
+        
         # Return
         return conn
 
