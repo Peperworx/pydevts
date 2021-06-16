@@ -30,9 +30,13 @@ class QUICConnection(PYDEVTSConnection):
         self.sock = await anyio.create_udp_socket(family=socket.AF_INET,
             local_host=0)
         
-        # Run handler
+        # Timer event
+        self.timer_event = anyio.Event()
+        self.timer_for = time.time() + 5
         
-
+        # Run handler
+        await anyio.to_thread.run_sync(self._wait_sync,cancellable=True)
+        print("hi")
         # QUIC connect
         self.wrapped.connect(
             (self.owner.host,self.owner.port,),
@@ -40,9 +44,14 @@ class QUICConnection(PYDEVTSConnection):
         )
 
         # Handle datagrams
-        await self._handle_datagrams()
+        await self._handle_systems()
     
-    async def _handle_datagrams(self):
+    def _wait_sync(self):
+        while time.time() < self.timer_for:
+            time.sleep(1)
+        anyio.from_thread.run_async_from_thread(self.cont)
+
+    async def _handle_systems(self):
         """
             Internal function to send datagrams
         """
@@ -71,14 +80,23 @@ class QUICConnection(PYDEVTSConnection):
             await anyio.sleep(t-time.time())
             self.wrapped.handle_timer(time.time())
 
-        await self._handle_datagrams()
+        await self._handle_systems()
 
     async def recv(self, size: int) -> bytes:
         """
             This method receives {size} data.
         """
         
-        pass
+        # Receive datagrams
+        data = await self.sock.receive()
+
+        self.wrapped.receive_datagram(data[0],data[1],time.time())
+
+        await self._handle_systems()
+
+        
+
+        
     
     async def close(self):
         """
