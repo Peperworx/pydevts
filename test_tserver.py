@@ -2,6 +2,7 @@ from pydevts.protocol.tcp import *
 import trio
 
 async def handler(conn: TCPTransport):
+    # Echo data back to client
     data = await conn.recv()
     await conn.send(data)
 
