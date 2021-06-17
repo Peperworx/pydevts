@@ -51,18 +51,18 @@ class PYDEVTSTransport:
         """
         ...
 
-    async def __aopen__(self) -> "PYDEVTSTransport":
+    async def __aenter__(self) -> "PYDEVTSTransport":
         """
-            Context manager __aopen__ that wraps self.open
+            Context manager __aenter__ that wraps self.open
         """
 
         return await self.open()
     
-    async def __aclose__(self, exc_type: Optional[Type[BaseException]],
+    async def __aexit__(self, exc_type: Optional[Type[BaseException]],
             exc_val: Optional[BaseException],
             exc_tcbk: Optional[TracebackType]):
         """
-            Context manager __aclose__ that wraps self.close
+            Context manager __aexit__ that wraps self.close
         """
 
         await self.close()

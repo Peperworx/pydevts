@@ -1,11 +1,11 @@
-from pydevts.protocol.tcp import *
+from pydevts.protocol.quic import *
 import trio
 import sys
 
 
 
 async def main():
-    tt = TCPTransport(("localhost",sys.argv[1]))
+    tt = QUICTransport(("google.com",sys.argv[1]))
 
     # With context manager
     async with tt as c:
