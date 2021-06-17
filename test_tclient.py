@@ -6,6 +6,8 @@ import sys
 
 async def main():
     tt = TCPTransport(("localhost",sys.argv[1]))
+
+    # With context manager
     async with tt as c:
         await c.send(bytes(sys.argv[2].encode()))
         print(await c.recv())
@@ -17,6 +19,8 @@ async def main():
     print(await tt.recv())
 
     await tt.close()
+
+    # This also shows hos to same object can be reused.
 
 
 if __name__ == '__main__':
