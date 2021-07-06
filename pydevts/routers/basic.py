@@ -4,6 +4,7 @@
 from ._base import RouterBase
 from typing import Optional
 from loguru import logger
+import msgpack
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import anyio
@@ -13,7 +14,7 @@ class BasicRouter(RouterBase):
 
 
     """
-        Message Codes:
+        Message type:
         0. Ping
         1. Info Request
         2. Info Response
@@ -23,9 +24,9 @@ class BasicRouter(RouterBase):
         6. Emit Message
     """
 
-    async def security_prep(self):
+    async def prepare_security(self):
         """
-            Prepares security systems.
+            Prepares security keys.
         """
         
 
@@ -53,10 +54,10 @@ class BasicRouter(RouterBase):
         conn = await anyio.connect_tcp(host, port)
 
         # Ping host online
-        await conn.send(struct.pack("BLL",0,0,0))
+        await conn.send(struct.pack("LBLL",0,0,0,0))
 
         # Await response
-        data = await conn.recv(struct.calcsize("BLL"))
+        data = await conn.recv(struct.calcsize("LBLL"))
 
         # Verify response
         if data != (0,0,0,):
@@ -64,10 +65,10 @@ class BasicRouter(RouterBase):
             return
         
         # Request node data
-        await conn.send(struct.pack("BLL",1,0,0))
+        await conn.send(struct.pack("LBLL",0,1,0,0))
 
         # Await node data
-        data = await conn.recv(struct.calcsize("BLL"))
+        data = await conn.recv(struct.calcsize("LBLL"))
 
         # Verify response
         if data[0] != 2:
@@ -76,7 +77,7 @@ class BasicRouter(RouterBase):
         # Pull actual data
         entry = await conn.recv(data[1])
 
-
+        print(entry)
         
         # Close connection
         await conn.aclose()
@@ -101,14 +102,61 @@ class BasicRouter(RouterBase):
         """
         pass
 
-    async def receive(self) -> Optional[bytes]:
+    async def receive(self, conn) -> Optional[bytes]:
         """
             Executed when raw data is received
             Arguments
             - {conn}
                 The Connection Object
         """
-        pass
+        
+        # Receive data
+        data = await conn.receive(struct.calcsize("LBLL"))
+
+        # Unpack header
+        header = struct.unpack("LBLL", data[:9])
+
+        # Verify magic number
+        if header[0] != 0xBEEFF00D:
+            return None
+        
+        # Switch on message type
+        if header[1] == 0:
+            # Ping
+            
+            # Reply with pong
+            await conn.send(struct.pack("LBLL",0xBEEFF00D,0,0,0))
+        elif header[1] == 1:
+            # Info Request
+
+            # Pack data
+            data = msgpack.dumps(self.info())
+            
+            # Pack header into data
+            data = struct.pack("LBLL",0xBEEFF00D,2,len(data),0) + data
+
+            # Send data
+            await conn.send(data)
+        
+        elif header[1] == 3:
+            # Join Request
+            pass
+        elif header[1] == 4:
+            # Join Response
+            pass
+        elif header[1] == 5:
+            # Send Message
+            pass
+        elif header[1] == 6:
+            # Emit Message
+            pass
+        else:
+            # Unknown message
+            return None
+
+        
+
+
     
     
     
