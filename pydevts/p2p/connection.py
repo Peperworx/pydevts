@@ -1,4 +1,9 @@
 from ..routers import BasicRouter
+import anyio
+import contextlib
+from loguru import logger
+import uuid
+from .. import error
 
 class P2PConnection:
     """
@@ -29,16 +34,79 @@ class P2PConnection:
         
         self.router = BasicRouter(self)
 
+        # Generate node id
+        self.nid = str(uuid.uuid4())
+
+        self.tg = None
+    
+    async def serve(self, task_status):
+        """
+            Create anyio TCP listener.
+            Use a random open port, and save it to a variable
+        """
+        # Create async TCP listener (using anyio)
+        self.listener = await anyio.create_tcp_listener(local_host="0.0.0.0", local_port=0)
+        
+        # Get local port from the raw socket of the first listener
+        self.port = self.listener.listeners[0]._raw_socket.getsockname()[1]
+
+        # Tell task group we are ready
+        task_status.started()
+
+        # Log that we are hosting
+        logger.info(f"Serving on port {self.port}")
+
+        # Start server in exit stack
+        await self.listener.serve(self.handler)
+
+    @error.catch_all_continue
+    async def handler(self, conn):
+        """
+            Handle a connection
+        """
+        while True:
+            # Pass along to router
+            await self.router.receive(conn)
+
     async def __aenter__(self) -> "P2PConnection":
+
+        # Clear kill flag
+        self.kill = False
+
+        # If task group is not None, fail
+        if self.tg is not None:
+            raise RuntimeError("Connection already in use")
+
+        # Create async exit stack
+        self.es = contextlib.AsyncExitStack()
+
+
+        # Prepare Task Group
+        self.tg = await self.es.enter_async_context(anyio.create_task_group())
+
+        
 
         # Prepare security
         await self.router.prepare_security()
 
+        
+
         # Connect router to entry node
-        await self.router.connect_to(self.entry[0], self.entry[1])
+        self.entry = await self.router.connect_to(self.entry[0], self.entry[1])
+
+        # Call serve function in task group
+        await self.tg.start(self.serve)
 
         # Return self
         return self
     
     async def __aexit__(self, *args) -> "P2PConnection":
-        pass
+        
+        # Set kill flag
+        self.kill = True
+
+        # Clear exit stack
+        await self.es.aclose()
+
+        # Clear task group
+        self.tg = None
