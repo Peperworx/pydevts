@@ -157,12 +157,15 @@ class BasicRouter(RouterBase):
             logger.debug(f"Failed to enter via node {host}:{port}")
             return
         
+
         # Verify decrypted data
         if plaintext != key:
             logger.debug(f"Failed to enter via node {host}:{port}")
             return
 
         
+
+
         # Close connection
         await conn.aclose()
     
