@@ -33,4 +33,24 @@ It then sends the second message as a response to the first:
 
 The contacting node then decrypts the 32 bytes and xors them. (This is used to ensure that a random number generator on one of the systems can not be rigged)
 
-Those 32 bytes are then used to seed a random number generator, which is only used for the task of encryption for those two specific nodes, and each further message or datagram to the other node is sent AES encrypted with a number pulled from that number generator. 
+Those 32 bytes are then used to seed a random number generator, which is only used for the task of encryption for those two specific nodes, and each further message or datagram to the other node is sent AES encrypted with a number pulled from that number generator.
+
+## Caching
+
+Each node will keep a cache of other nodes that it has contacted. This includes their IP address, the port used, the initial random value used when connecting, the number of calls to the random number generator, and the last generated random number as the seed.
+
+## Message format
+
+When a message is sent, it contains a very basic header:
+
+
+- The first and last 32 bits of the 32 byte number used when the node was first contacted. These combine to a 64 bit number which can be used to retrieve data about the other client from past requests. This is 0 if this is a first request, and if it is, no encryption attempts will be made, and no sensitive data will be transmitted.
+- The length of the message body in bytes (32 bit integer)
+- CRC32 code of data
+
+That is it.
+A few numbers.
+And the Body.
+
+If the body length is zero, and the CRC is non-zero, then it is an acknowledgement and the CRC is double checked to make sure we are talking about the same message. If we are not, find the message and verify it was sent. If that message was not sent, then the message should be ignored. A cache of all CRCs should be kept to minimize impact of improper responses, in case of DOS attacks.
+
