@@ -9,7 +9,7 @@ The PYDEVTS protocol has two connection types. Stream and message.
 ### Stream
 
 The stream protocol type is most similar to TCP. You send and receive data in a connection, and then disconnect when you are done sending data.
-
+This is implemented on top of the message system, which already provides most of what the stream system does provide.
 ### Message
 
 The message protocol is the hybrid of UDP and TCP. The server sends a datagram, and if it does not receive an acknowledgement within a specified timeout, it sends it again. This is designed with the idea of delivering messages quickly without losing data. The message protocol is not ordered, meaning packets may not arrive in the order they were sent, and is designed for use in event systems, as well as other pseudo "fire-and-forget" systems.
@@ -47,6 +47,7 @@ When a message is sent, it contains a very basic header:
 - The first and last 32 bits of the 32 byte number used when the node was first contacted. These combine to a 64 bit number which can be used to retrieve data about the other client from past requests. This is 0 if this is a first request, and if it is, no encryption attempts will be made, and no sensitive data will be transmitted.
 - The length of the message body in bytes (32 bit integer)
 - CRC32 code of data
+
 
 That is it.
 A few numbers.
