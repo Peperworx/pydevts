@@ -5,7 +5,10 @@ from pydevts.conn import PYDEVTSMessageProto
 from anyio import create_task_group, run
 import sys
 
-app = PYDEVTSMessageProto()
+async def on_msg(msg):
+    print(msg)
+
+app = PYDEVTSMessageProto(on_msg)
 
 async def send_msg():
     if sys.argv[1] == "send":
