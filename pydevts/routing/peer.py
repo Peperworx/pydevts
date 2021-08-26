@@ -1,14 +1,17 @@
 """
-    Provides a base class for routing.
+    Basic peer-based routing system
 """
+
+# Router parent
+from ._base import _Router
 
 # Type Hints
 from ..connwrapper import _WrappedConnection
 from typing import Callable
 
 
-class _Router:
-    """A Base class for pydevts routers
+class PeerRouter(_Router):
+    """Peer-based routing system
     """
 
     keypair: tuple[str, str]
@@ -51,3 +54,4 @@ class _Router:
         """
 
         raise NotImplementedError()
+
