@@ -26,16 +26,16 @@ class NodeHost:
 
     local_host: str
     local_port: int
-    keypair: tuple[str, str]
+    ssl_context: ssl.SSLContext
     handler: Callable[[_WrappedConnection], None]
 
-    def __init__(self, local_host: str = None, local_port: int = None, keypair: tuple[str, str] = (None, None)):
+    def __init__(self, local_host: str = None, local_port: int = None, ssl_context: ssl.SSLContext = None):
         """[summary]
 
         Args:
             local_host (str, optional): IP address to host the server on. Defaults to None.
             local_port (int, optional): Port to host the server on. Defaults to None.
-            keypair (tuple, optional): Tuple of PYCryptoDome public and private keys.. Defaults to (None, None).
+            ssl_context (ssl.SSLContext, optional): SSL context to use for TLS. Defaults to None.
         """
 
         # Validate local host
@@ -48,15 +48,14 @@ class NodeHost:
             logger.debug('No port specified. Choosing random port')
             local_port = 0
         
-        # Validate keypair
-        if None in keypair:
-            logger.warning('No keypair provided. The server will be unable to start in TLS mode.')
-            keypair = (None, None)
+        # Validate ssl context
+        if ssl_context == None:
+            logger.warning('No ssl context provided. The server will be unable to start in TLS mode.')
         
         # Set values
         self.local_host = local_host
         self.local_port = local_port
-        self.keypair = keypair
+        self.ssl_context = ssl_context
 
     
     
@@ -76,19 +75,19 @@ class NodeHost:
         await connection.close()
 
     
-    async def run(self, handler: Callable[[_WrappedConnection], None], tls: bool = False):
+    async def run(self, handler: Callable[[_WrappedConnection], None], tls: bool = True):
         """Start the server
 
         Args:
-            tls (bool, optional): If we should start in TLS mode. Defaults to False.
+            tls (bool, optional): If we should start in TLS mode. Defaults to True.
         """
         # Set the handler
         self.handler = handler
 
 
         # Verify we can use TLS
-        if tls and None in self.keypair:
-            raise RuntimeError("Unable to start in TLS mode. No valid keypair provided.")
+        if tls and self.ssl_context == None:
+            raise RuntimeError("Unable to start in TLS mode. No valid ssl context provided.")
         
         # Log that we are initializing the server
         logger.debug("Initializing server")
@@ -101,13 +100,8 @@ class NodeHost:
 
         # If we are using TLS, overwrite with TLS listener
         if tls:
-            # Create ssl context
-            context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            # Load the keypair
-            context.load_cert_chain(certfile=self.keypair[0], keyfile=self.keypair[1])
-
             # Create TLS listener
-            listener = TLSListener(listener, context)
+            listener = TLSListener(listener, self.ssl_context)
 
         # Log that we are starting the server
         logger.info(f"Starting server on host {self.local_host}:{port}")

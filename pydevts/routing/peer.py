@@ -8,22 +8,23 @@ from ._base import _Router
 # Type Hints
 from ..connwrapper import _WrappedConnection
 from typing import Callable
+import ssl
 
 
 class PeerRouter(_Router):
     """Peer-based routing system
     """
 
-    keypair: tuple[str, str]
+    ssl_context: tuple[str, str]
 
-    def __init__(self, keypair: tuple[str, str] = (None, None)):
+    def __init__(self, ssl_context: ssl.SSLContext = None):
         """Initialize the router
 
         Args:
-            keypair (tuple[str, str], optional): The public-private keypair to use for encryption. Defaults to (None, None).
+            ssl_context (tuple[str, str], optional): The public-private ssl_context to use for encryption. Defaults to None.
         """
 
-        self.keypair = keypair
+        self.ssl_context = ssl_context
     
     async def enter(self, host: str, port: int, tls: bool = False):
         """Enters a cluster

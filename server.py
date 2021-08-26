@@ -1,10 +1,14 @@
 from pydevts.host import NodeHost
 import anyio
+import ssl
+
+context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+context.load_cert_chain("./certs/test.pem", "./certs/test.key")
 
 host = NodeHost(
     local_host="0.0.0.0",
     local_port=8080,
-    keypair=("./certs/test.pem", "./certs/test.key")
+    ssl_context=context,
 )
 
 
