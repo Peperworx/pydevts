@@ -8,6 +8,9 @@ repository = "https://github.com/Peperworx/pydevts"
 
 [tool.poetry.dependencies]
 python = "^3.9"
+loguru = "^0.5.3"
+anyio = "^3.3.0"
+msgpack = "^1.0.2"
 
 
 [build-system]

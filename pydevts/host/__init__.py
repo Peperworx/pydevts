@@ -1,11 +1,23 @@
 """
     Implements a basic TCP message host
 """
+# Logging
 from ..logger import logger
-from typing import Callable
-from anyio import create_tcp_listener
+
+# Type hints
+from typing import Callable, Union
+
+# Anyio
+import anyio
+
+# Encryption
 from anyio.streams.tls import TLSListener
 import ssl
+
+# Wrapped connection
+from ..connwrapper import _WrappedConnection
+
+
 
 class NodeHost:
     """
@@ -15,6 +27,7 @@ class NodeHost:
     local_host: str
     local_port: int
     keypair: tuple[str, str]
+    handler: Callable[[_WrappedConnection], None]
 
     def __init__(self, local_host: str = None, local_port: int = None, keypair: tuple[str, str] = (None, None)):
         """[summary]
@@ -45,25 +58,33 @@ class NodeHost:
         self.local_port = local_port
         self.keypair = keypair
 
-    @logger.catch
-    def register_handler(self, handler):
-        """
-            Register a handler for the server
-        """
-        
-        self.handlers.append(handler)
     
-    @logger.catch
+    
     async def _listen_handle(self, conn):
-        print("Connection")
+        
 
-    @logger.catch
-    async def run(self, tls: bool = False):
+        # Wrap the connection
+        connection = _WrappedConnection(conn)
+
+        try:
+            # Call the handler
+            await self.handler(connection)
+        except anyio.EndOfStream:
+            pass
+
+        # Close the connection
+        await connection.close()
+
+    
+    async def run(self, handler: Callable[[_WrappedConnection], None], tls: bool = False):
         """Start the server
 
         Args:
             tls (bool, optional): If we should start in TLS mode. Defaults to False.
         """
+        # Set the handler
+        self.handler = handler
+
 
         # Verify we can use TLS
         if tls and None in self.keypair:
@@ -73,7 +94,7 @@ class NodeHost:
         logger.debug("Initializing server")
 
         # Create the server
-        listener = create_tcp_listener(self.local_host, self.local_port)
+        listener = await anyio.create_tcp_listener(local_host=self.local_host, local_port=self.local_port)
 
         # Get the port
         port = listener.listeners[0]._raw_socket.getsockname()[1]
@@ -82,12 +103,11 @@ class NodeHost:
         if tls:
             # Create ssl context
             context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-
             # Load the keypair
             context.load_cert_chain(certfile=self.keypair[0], keyfile=self.keypair[1])
 
             # Create TLS listener
-            listener = TLSListener(listener, context=context)
+            listener = TLSListener(listener, context)
 
         # Log that we are starting the server
         logger.info(f"Starting server on host {self.local_host}:{port}")

@@ -23,21 +23,28 @@ from typing import Optional, Union
 import msgpack
 import struct
 
+# Encryption
+import ssl
+
 class NodeConnection:
     
     connections: dict[str, Union[TLSStream, SocketStream]]
+    verify_key: Optional[str]
 
-    def __init__(self: "NodeConnection"):
+    def __init__(self: "NodeConnection", verify_key: str = None):
         """Message wrapper for handling multiple TCP connections.
 
         Args:
             self (NodeConnection): [description]
         """
 
+        # Set verify key
+        self.verify_key = verify_key
+
         # Initialize dictionary of connections
         self.connections = dict()
         
-    @logger.catch
+    
     async def connect(self: "NodeConnection", remote_host: str, remote_port: int, usetls: bool = False) -> str:
         """Connect to remote TCP host
 
@@ -51,8 +58,19 @@ class NodeConnection:
             str: The locally used ID for the remote host. Used when sending data to the host.
         """
 
-        # Create a new connection, if using TLS, pass that as well
-        connection = await connect_tcp(remote_host, remote_port, tls=usetls)
+        # If we have a verify key, use it for untrusted connections
+        if usetls and self.verify_key:
+            # Create ssl context
+            context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+
+            # Load the verify key
+            context.load_verify_locations(cafile=self.verify_key)
+
+            # Create a new connection
+            connection = await connect_tcp(remote_host, remote_port, ssl_context=context)
+        else:
+            # Create a new connection, if using TLS, pass that as well
+            connection = await connect_tcp(remote_host, remote_port, tls=usetls)
 
 
         # Generate a new ID for the remote host
@@ -69,7 +87,7 @@ class NodeConnection:
         # Return the ID
         return remote_id
 
-    @logger.catch
+    
     async def disconnect(self: "NodeConnection", remote_id: str):
         """Disconnect from remote TCP host
 
@@ -88,18 +106,18 @@ class NodeConnection:
         # Remove the connection from the list of connections
         del self.connections[remote_id]
 
-    @logger.catch
+    
     async def close(self: "NodeConnection"):
         """Close all connections"""
 
         # Close all connections
         for connection in self.connections.values():
             await connection.aclose()
-
+        
         # Clear the list of connections
         self.connections = dict()
     
-    @logger.catch
+    
     async def send(self: "NodeConnection", remote_id: str, name: str, data: bytes):
         """Send a message to a remote host
         
@@ -117,10 +135,10 @@ class NodeConnection:
         length = struct.pack('!I', len(data))
 
         # Send the message
-        await self.connections[remote_id].send_all(length + data)
+        await self.connections[remote_id].send(length + data)
         
     
-    @logger.catch
+    
     async def recv(self: "NodeConnection", remote_id: str) -> tuple[str, bytes]:
         """Receive a message from a remote host
 
@@ -145,14 +163,14 @@ class NodeConnection:
         data = msgpack.unpackb(data)
 
         # Validate that data returned is a tuple of the correct size
-        if data.isinstance(tuple) and len(data) != 2:
+        if not isinstance(data, list) or len(data) != 2:
             raise ValueError('Remote host returned invalid data')
 
 
         # Return the name and data
         return data
     
-    @logger.catch
+    
     async def emit(self: "NodeConnection", name: str, data: bytes):
         """Send a message to all connected nodes
 
