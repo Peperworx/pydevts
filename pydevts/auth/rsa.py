@@ -17,9 +17,10 @@ from Cryptodome.Cipher import PKCS1_OAEP, AES
 from Cryptodome.PublicKey import RSA
 import secrets
 
+
 class AuthRSA(_Auth):
     """
-        Authentication method that uses a RSA keypair and random symmetric key.
+        Authentication method that uses a RSA keypair
     """
 
     pubkey: bytes
@@ -44,96 +45,78 @@ class AuthRSA(_Auth):
             conn (_WrappedConnection): The connection that we are using
         """
 
-        # Generate random symmetric key
-        key = secrets.token_bytes(16)
+        print('RSA')
 
-        # Load the public key
-        pubkey = RSA.import_key(self.pubkey)
+        # Tell the server we are ready
+        await conn.send("START_RSA", b"")
 
-        # Load the private key
-        privkey = RSA.import_key(self.privkey)
+        # Receive the encrypted random number
+        msg = await conn.recv()
 
-        # Encrypt the symmetric key with the public key
-        cipher = PKCS1_OAEP.new(pubkey)
-        enc_key = cipher.encrypt(key)
+        # Verify the name
+        if msg[0] != "RSA_RAND":
+            raise AuthenticationError("Invalid handshake message")
+        try:
+            # Decrypt the random number
+            cipher = PKCS1_OAEP.new(RSA.import_key(self.privkey))
+            rand = cipher.decrypt(msg[1])
+        except ValueError:
+            raise AuthenticationError("Invalid private key")
 
-        # Send the encrypted key
-        await conn.send("START_RSA", enc_key)
+        # Reverse all bytes of the random number
+        nrand = bytearray(rand)
+        nrand.reverse()
+        new_rand = bytes(nrand)
 
-        # Create a new AES cipher
-        cipher = AES.new(key, AES.MODE_EAX)
-
-        # Receive the encrypted nonce
-        enc_nonce = await conn.recv()
-
-        # Verify the name sent with it
-        if enc_nonce[0] != "START_AES":
-            raise AuthenticationError("Invalid message received")
         
-        # Decrypt the nonce
-        nonce = cipher.decrypt_and_verify(enc_nonce[1], enc_nonce[2])
+        # Send back
+        await conn.send("RSA_RAND", new_rand)
 
-        # Create the private key cipher
-        cipher = PKCS1_OAEP.new(privkey)
+        # AUTH: Complete
 
-        # Encrypt it using the private key
-        nenc_nonce = cipher.encrypt(nonce)
-
-        # Send the encrypted nonce as the FINISH_RSA name
-        await conn.send("FINISH_RSA", nenc_nonce)
-
+    
     async def accept_handshake(self, conn: _WrappedConnection):
         """The server side version of _Auth.handshake
 
         Args:
             conn (_WrappedConnection): The connection that we are using
         """
-
-        # Expect the client to send the encrypted symmetric key
-        enc_key = await conn.recv()
-
-        # Verify that the message is a START_RSA message
-        if enc_key[0] != "START_RSA":
-            raise AuthenticationError("Invalid message received")
+        print("RSA Server")
         
-        # If it is OK, load the private key
-        privkey = RSA.import_key(self.privkey)
+        # Receive initial message
+        msg = await conn.recv()
 
-        # Load the public key
-        pubkey = RSA.import_key(self.pubkey)
-
-        # Decrypt the symmetric key
-        cipher = PKCS1_OAEP.new(privkey)
-        key = cipher.decrypt(enc_key[1])
-
-        # Create a new AES cipher
-        cipher = AES.new(key, AES.MODE_EAX)
-
-        # Create a random value
-        nonce = secrets.token_bytes(16)
-
-        # Encrypt the nonce with the AES cipher
-        ciphertext, tag = cipher.encrypt_and_digest(nonce)
-
-        # Send the encrypted nonce
-        await conn.send("START_AES", ciphertext, tag)
-
-        # Receive the encrypted nonce
-        enc_nonce = await conn.recv()
-
-        # Verify the name sent with it
-        if enc_nonce[0] != "FINISH_RSA":
-            raise AuthenticationError("Invalid message received")
+        # Verify the name
+        if msg[0] != "START_RSA":
+            raise AuthenticationError("Invalid handshake message")
         
-        # Create the public key cipher
-        cipher = PKCS1_OAEP.new(privkey)
+        # Generate a random number
+        rand = secrets.token_bytes(16)
 
-        # Decrypt the nonce with the public key
-        dec_nonce = cipher.decrypt(enc_nonce[1])
+        # Encrypt the random number
+        cipher = PKCS1_OAEP.new(RSA.import_key(self.pubkey))
+        enc_rand = cipher.encrypt(rand)
 
-        # Verify the integrity of the value
-        if dec_nonce != nonce:
-            raise AuthenticationError("Invalid nonce received")
+        # Send the encrypted random number
+        await conn.send("RSA_RAND", enc_rand)
+
+        # Receive the encrypted random number
+        msg = await conn.recv()
+
+        # Verify the name
+        if msg[0] != "RSA_RAND":
+            raise AuthenticationError("Invalid handshake message")
+        
+        # Reverse rand
+        nrand = bytearray(rand)
+        nrand.reverse()
+        new_rand = bytes(nrand)
+
+        # Verify the random number
+        if msg[1] != new_rand:
+            raise AuthenticationError("Invalid handshake nonce")
+        
+        # AUTH: Complete
 
 
     

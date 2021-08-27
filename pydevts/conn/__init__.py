@@ -6,10 +6,14 @@
           Messages are sent with a "name" and some "data". Streams *can* be used, but they are implemented as a specific message type.
 """
 # Logging
+from pydevts.auth import AuthenticationError
 from ..logger import logger as logger
 
 # UUID for random connection IDs
 from uuid import uuid4
+
+# Connection wrapper
+from ..connwrapper import _WrappedConnection
 
 # For starting connections
 from anyio import connect_tcp
@@ -83,8 +87,15 @@ class NodeConnection:
 
         # Run authentication
         if self.auth_method:
-            # Execute handshake
-            await self.auth_method.handshake(connection)
+            try:
+                # Execute handshake
+                await self.auth_method.handshake(_WrappedConnection(connection))
+            except AuthenticationError:
+                # Close connection
+                await connection.aclose()
+
+                # Raise error
+                raise
 
         # Generate a new ID for the remote host
         remote_id = str(uuid4())
