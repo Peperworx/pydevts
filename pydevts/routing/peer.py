@@ -15,11 +15,15 @@ from ._base import _Router
 # Type Hints
 from ..connwrapper import _WrappedConnection
 from typing import Callable
+from ..auth._base import _Auth
 import ssl
 
 # Node hosts and connections
 from ..host import NodeHost
 from ..conn import NodeConnection
+
+# Auth
+from ..auth.noauth import AuthNone
 
 class PeerRouter(_Router):
     """Peer-based routing system
@@ -35,6 +39,7 @@ class PeerRouter(_Router):
     entry: str
     node_id: str
     peers: dict[str, tuple[str, int]]
+    auth_method: _Auth
 
     def __init__(self, ssl_context: ssl.SSLContext = None):
         """Initialize the router
@@ -47,7 +52,7 @@ class PeerRouter(_Router):
 
         self.peers = dict()
     
-    async def enter(self, host: str, port: int, host_addr: tuple[str, int], tls: bool = False, verify_key: str = None):
+    async def enter(self, host: str, port: int, host_addr: tuple[str, int], tls: bool = False, verify_key: str = None, auth_method: _Auth = AuthNone()):
         """Enters a cluster
 
         Args:
@@ -64,9 +69,10 @@ class PeerRouter(_Router):
         self.tls = tls
         self.verify_key = verify_key
         self.host_addr = host_addr
+        self.auth_method = auth_method
 
         # Create the connection
-        self.connection = NodeConnection(self.verify_key)
+        self.connection = NodeConnection(self.verify_key, auth_method=self.auth_method)
 
         # Wrap with try, except so that we can detect if the connection fails
         try:

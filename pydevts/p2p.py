@@ -9,10 +9,15 @@ from .connwrapper import _WrappedConnection
 from ssl import SSLContext
 from .routing._base import _Router
 from typing import Callable
+from .auth._base import _Auth
 
 # Node hosts and connections
 from .host import NodeHost
 from .conn import NodeConnection
+
+# Authentication
+from .auth.noauth import AuthNone
+
 
 class P2PConnection:
     """Peer to peer data passing
@@ -31,7 +36,7 @@ class P2PConnection:
 
     def __init__(self, host: str = "0.0.0.0", port: int = 0,
         router: _Router = PeerRouter,
-        ssl_context: SSLContext = None):
+        ssl_context: SSLContext = None, auth_method: _Auth = AuthNone()):
         """Initialize P2PConnection
 
         Args:
@@ -67,14 +72,14 @@ class P2PConnection:
         self.usetls = usetls
     
         # Create the host
-        self.server = NodeHost(self.host, self.port, ssl_context=self.ssl_context)
+        self.server = NodeHost(self.host, self.port, ssl_context=self.ssl_context, auth_method=self.auth_method)
 
         # Prepare the host
         await self.server.init(self.router.on_connection, self.usetls)
 
         # Tell router to enter the network
         await self.router.enter(host, port, (self.server.local_host, self.server.local_port),
-            usetls, verify_key)
+            tls=usetls, verify_key=verify_key, auth_method=self.auth_method)
 
     async def run(self):
         """Start running the server

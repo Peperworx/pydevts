@@ -4,6 +4,7 @@
 
 # Type hints
 from ..connwrapper import _WrappedConnection
+from ..auth._base import _Auth
 
 class _Auth:
     """
