@@ -2,6 +2,7 @@
 
 import anyio
 
+
 # The underlying connection
 from pydevts.p2p import P2PConnection
 
@@ -9,6 +10,7 @@ from pydevts.p2p import P2PConnection
 from ssl import SSLContext
 from typing import Callable
 from .auth._base import _Auth
+import anyio.abc
 
 # Authentication
 from .auth.noauth import AuthNone
@@ -25,7 +27,8 @@ class _Node:
     auth_method: _Auth
     _events: dict[str, Callable[[bytes], None]]
 
-    def __init__(self, entry_addr: tuple[str, int], ssl_context: SSLContext = None, auth_method: _Auth = AuthNone()):
+    def __init__(self, entry_addr: tuple[str, int], host_addr: tuple[str, int] = ("0.0.0.0", 0), 
+        ssl_context: SSLContext = None, auth_method: _Auth = AuthNone()):
         """Basic peer to peer node for messaging
 
         Args:
@@ -40,7 +43,8 @@ class _Node:
         self.auth_method = auth_method
 
         # Create the connection
-        self.conn = P2PConnection(ssl_context = self.ssl_context, auth_method=auth_method)
+        self.conn = P2PConnection(host = host_addr[0], port = host_addr[1], 
+            ssl_context = self.ssl_context, auth_method=auth_method)
 
         # Bind event handlers
         self.conn.register_data_handler(self._on_data)
@@ -48,7 +52,8 @@ class _Node:
         # Initialize events
         self.on_start = []
         self._events = dict()
-    async def run(self, verify_key: str = None):
+    
+    async def run(self, verify_key: str = None, task_status: anyio.abc.TaskStatus = anyio.TASK_STATUS_IGNORED):
         """Begins running the node
         
         Args:
@@ -58,6 +63,9 @@ class _Node:
         # Connect to the entry node
         await self.conn.connect(*self.entry_addr, self.ssl_context != None, verify_key=verify_key)
         
+        # Trigger task status
+        task_status.started()
+
         # Create anyio task group
         async with anyio.create_task_group() as tg:
             # Run the server
@@ -76,7 +84,7 @@ class _Node:
 
         self.on_start.append(handler)
     
-    def bind(self, name: str, handler: Callable[[bytes], None]):
+    def bind(self, name: str, handler: Callable[[str, str, bytes], None]):
         """Binds handler to an event name
 
         Args:
@@ -105,7 +113,7 @@ class _Node:
         # If we have no events of this name, just return
         if name not in self._events.keys():
             return
-        
+
         # Call all handlers
         for handler in self._events[name]:
             await handler(node, name, data)
