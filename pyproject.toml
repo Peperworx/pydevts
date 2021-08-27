@@ -11,6 +11,7 @@ python = "^3.9"
 loguru = "^0.5.3"
 anyio = "^3.3.0"
 msgpack = "^1.0.2"
+pycryptodomex = "^3.10.1"
 
 
 [build-system]
