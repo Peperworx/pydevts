@@ -33,6 +33,7 @@ class P2PConnection:
     router: _Router
     server: NodeHost
     handler: Callable[[_WrappedConnection], None]
+    auth_method: _Auth
 
     def __init__(self, host: str = "0.0.0.0", port: int = 0,
         router: _Router = PeerRouter,
@@ -51,6 +52,9 @@ class P2PConnection:
 
         # Save ssl context
         self.ssl_context = ssl_context
+
+        # Save auth method
+        self.auth_method = auth_method
 
         # Initialize router
         self.router = router(self.ssl_context)

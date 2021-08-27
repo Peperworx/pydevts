@@ -11,7 +11,7 @@ from typing import Callable
 from .auth._base import _Auth
 
 # Authentication
-from .auth.noauth import NoAuth
+from .auth.noauth import AuthNone
 
 class _Node:
     """Basic peer to peer node for messaging"""
@@ -21,7 +21,7 @@ class _Node:
     on_start: list[Callable[[],None]]
     auth_method: _Auth
 
-    def __init__(self, entry_addr: tuple[str, int], ssl_context: SSLContext = None, auth_method: _Auth = NoAuth()):
+    def __init__(self, entry_addr: tuple[str, int], ssl_context: SSLContext = None, auth_method: _Auth = AuthNone()):
         """Basic peer to peer node for messaging
 
         Args:

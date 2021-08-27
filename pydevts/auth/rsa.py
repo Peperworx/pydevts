@@ -13,7 +13,7 @@ from ._base import _Auth
 from . import AuthenticationError
 
 # Authentication
-import Cryptodome.Cipher import PKCS1_OAEP, AES
+from Cryptodome.Cipher import PKCS1_OAEP, AES
 from Cryptodome.PublicKey import RSA
 import secrets
 
