@@ -1,14 +1,13 @@
-from pydevts.node import _Node
+from pydevts.pub import Node
 from pydevts.auth.rsa import AuthRSA
-import anyio
 import sys
-from loguru import logger
 
 
+# Gather port from command line
 port = 2233
-
 if len(sys.argv) > 1:
     port = int(sys.argv[1])
+
 
 # Load RSA keys from files
 with open(f"./certs/{sys.argv[2]}", "rb") as f:
@@ -20,25 +19,26 @@ with open(f"./certs/{sys.argv[2]}.pub", "rb") as f:
 # Create RSA auth method
 auth_method = AuthRSA(pubkey, privkey)
 
-node = _Node(('localhost', port),auth_method=auth_method)
 
-async def on_bcast(nodeid, name, data):
-    print(f"{name}: {data}")
-    await node.send(nodeid, "resp", data)
+# Initialize node
+node = Node("localhost", port, auth_method=auth_method)
 
-async def on_resp(nodeid, name, data):
-    print(f"RESP {name}: {data}")
 
-async def on_start():
-    await node.emit("bcast", b"hello, world!")
 
-node.bind_start(on_start)
-node.bind("bcast", on_bcast)
-node.bind("resp", on_resp)
+@node.on("test_bcast")
+async def test_bcast(from_node: str, name: str, data: bytes):
+    print(f"{from_node} sent {name} with data {data} over broadcast")
 
-@logger.catch
-async def main():
-    await node.run()
+    node.send(from_node, "bcase_response", data)
+
+@node.on("bcast_response")
+async def bcast_response(from_node: str, name: str, data: bytes):
+    print(f"{from_node} sent {name} with data {data} as response to broadcast")
+
+@node.on_sys("startup")
+async def startup():
+    print("Node is starting up")
+    node.emit('test_bcast', b"Hello World")
 
 if __name__ == "__main__":
-    anyio.run(main)
+    node.run()
