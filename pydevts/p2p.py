@@ -103,7 +103,7 @@ class P2PConnection:
         # Start the server
         await self.server.run()
     
-    async def on_data(self, node: str,  data: bytes):
+    async def on_data(self, node: str, data: bytes):
         """Called when data is received
 
         Args:
@@ -115,7 +115,7 @@ class P2PConnection:
         for handler in self.data_handler:
             await handler(node, data)
 
-    def register_data_handler(self, handler: Callable[[bytes], None]):
+    def register_data_handler(self, handler: Callable[[str, bytes], None]):
         """Register a handler for data received
 
         Args:

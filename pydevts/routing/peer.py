@@ -40,7 +40,7 @@ class PeerRouter(_Router):
     node_id: str
     peers: dict[str, tuple[str, int]]
     auth_method: _Auth
-    data_handler: Callable[[bytes],None]
+    data_handler: Callable[[str, bytes],None]
 
     def __init__(self, ssl_context: ssl.SSLContext = None):
         """Initialize the router
@@ -117,6 +117,11 @@ class PeerRouter(_Router):
             node_id (str): The ID of the node to send to
             data (bytes): The data to send
         """
+
+        if node_id == self.node_id:
+            # If we are sending to ourselves, just handle it
+            await self.data_handler(self.node_id, data)
+            return
 
         # Open connection
         connection = await self.connection.connect(self.peers[node_id][0], self.peers[node_id][1], self.tls)

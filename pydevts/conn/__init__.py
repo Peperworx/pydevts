@@ -197,7 +197,7 @@ class NodeConnection:
             raise ValueError('Remote host returned invalid data')
 
         # Set last access time for connection
-        self.connections[data[0]][1] = time.time()
+        self.connections[remote_id][1] = time.time()
 
         # Return the name and data
         return data
