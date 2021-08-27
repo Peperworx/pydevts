@@ -10,6 +10,7 @@ import struct
 
 class _WrappedConnection:
     _connection: SocketStream
+    addr: tuple[str, int]
 
     def __init__(self: '_WrappedConnection', connection: SocketStream):
         """Wraps a socket stream to provide a message based interface
@@ -20,6 +21,8 @@ class _WrappedConnection:
         """
         
         self._connection = connection
+
+        self.addr = connection._raw_socket.getsockname()
 
     
     async def close(self):

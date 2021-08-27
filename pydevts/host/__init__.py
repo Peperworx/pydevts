@@ -74,16 +74,16 @@ class NodeHost:
         # Close the connection
         await connection.close()
 
-    
-    async def run(self, handler: Callable[[_WrappedConnection], None], tls: bool = True):
-        """Start the server
+    async def init(self, handler: Callable[[_WrappedConnection], None], tls: bool = True):
+        """Initialize the server
 
         Args:
-            tls (bool, optional): If we should start in TLS mode. Defaults to True.
+            handler (Callable[[Any], None]): Handler to call when a connection is made
+            tls (bool, optional): Whether to use TLS. Defaults to True.
         """
+
         # Set the handler
         self.handler = handler
-
 
         # Verify we can use TLS
         if tls and self.ssl_context == None:
@@ -93,18 +93,24 @@ class NodeHost:
         logger.debug("Initializing server")
 
         # Create the server
-        listener = await anyio.create_tcp_listener(local_host=self.local_host, local_port=self.local_port)
+        self.listener = await anyio.create_tcp_listener(local_host=self.local_host, local_port=self.local_port)
 
         # Get the port
-        port = listener.listeners[0]._raw_socket.getsockname()[1]
+        self.local_port = self.listener.listeners[0]._raw_socket.getsockname()[1]
 
         # If we are using TLS, overwrite with TLS listener
         if tls:
             # Create TLS listener
-            listener = TLSListener(listener, self.ssl_context)
+            self.listener = TLSListener(self.listener, self.ssl_context)
+        
+        # Log that we have initialized the server
+        logger.info(f"Initialized server at {self.local_host}:{self.local_port}")
+    
+    async def run(self):
+        """Start the server
+        """
 
-        # Log that we are starting the server
-        logger.info(f"Starting server on host {self.local_host}:{port}")
+        logger.info(f"Starting server.")
 
         # Start the server
-        await listener.serve(self._listen_handle)
+        await self.listener.serve(self._listen_handle)
