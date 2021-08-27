@@ -15,12 +15,15 @@ class TCPConn:
 
     _conn: SocketStream
 
-    def __init__(self):
+    def __init__(self, wraps: SocketStream = None):
         """Initialize the class
+
+        Args:
+            wraps (SocketStream, optional): socket stream to wrap. Defaults to None
         """
 
         # Initialize socket stream to None
-        self._conn = None
+        self._conn = wraps
     
     async def connect(self, host: str, port: int):
         """Connect to a remote host
@@ -54,7 +57,7 @@ class TCPConn:
         """Receive data over the connection
 
         Args:
-            max_bytes (int): maximum number of bytes to receive
+            max_bytes (int, optional): maximum number of bytes to receive. Defaults to 65536
 
         Returns:
             bytes: data received
