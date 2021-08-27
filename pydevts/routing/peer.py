@@ -110,7 +110,7 @@ class PeerRouter(_Router):
             self.node_id = str(uuid.uuid4())
         
     
-    async def sendto(self, node_id: str, data: bytes):
+    async def send_to(self, node_id: str, data: bytes):
         """Sends data to a node
 
         Args:
@@ -122,7 +122,7 @@ class PeerRouter(_Router):
         connection = await self.connection.connect(self.peers[node_id][0], self.peers[node_id][1], self.tls)
 
         # Send data
-        await self.connection.send(connection, data)
+        await self.connection.send(connection, (self.node_id, data))
 
         # Clean all connections that have not been used in 60 seconds
         await connection.clean()
@@ -135,7 +135,7 @@ class PeerRouter(_Router):
         """
 
         # Delegate to subfunction
-        await self._emit(b'DATA', data)
+        await self._emit(b'DATA', (self.node_id, data))
 
     
     async def _emit(self, name: str, data: bytes):
@@ -164,7 +164,7 @@ class PeerRouter(_Router):
         await self.connection.send(handle, name, data)
         await self.connection.clean()
     
-    async def register_handler(self, datahandler: Callable[[bytes],None]):
+    async def register_handler(self, datahandler: Callable[[str, bytes],None]):
         """Registers the data handler
         
         Args:
@@ -208,7 +208,7 @@ class PeerRouter(_Router):
             elif data[0] == b'DATA':
                 # Handle data
                 if self.data_handler:
-                    self.data_handler(data[1])
+                    self.data_handler(data[1][0], data[1][1])
         
 
     

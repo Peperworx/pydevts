@@ -36,7 +36,7 @@ class _Router:
 
         raise NotImplementedError()
     
-    async def sendto(self, node_id: str, data: bytes):
+    async def send_to(self, node_id: str, data: bytes):
         """Sends data to a node
 
         Args:
@@ -55,7 +55,7 @@ class _Router:
 
         raise NotImplementedError()
     
-    async def register_handler(self, datahandler: Callable[[bytes],None]):
+    async def register_handler(self, datahandler: Callable[[str, bytes],None]):
         """Registers the data handler
         
         Args:
