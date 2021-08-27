@@ -42,6 +42,7 @@ class NodeHost:
             local_host (str, optional): IP address to host the server on. Defaults to None.
             local_port (int, optional): Port to host the server on. Defaults to None.
             ssl_context (ssl.SSLContext, optional): SSL context to use for TLS. Defaults to None.
+            auth_method (_Auth): The authentication method to be used
         """
 
         # Validate local host

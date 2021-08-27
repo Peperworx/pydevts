@@ -40,6 +40,8 @@ class NodeConnection:
 
         Args:
             self (NodeConnection): [description]
+            verify_key (str): The key to be used to verify untrusted connections.
+            auth_method (_Auth): The authentication method to be used
         """
 
         # Set verify key

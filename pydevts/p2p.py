@@ -42,6 +42,7 @@ class P2PConnection:
         Args:
             host (str): The hostname to host on
             port (int, optional): The port to host on. Defaults to 0.
+            auth_method (_Auth): The authentication method to be used
         """
 
         # Save host and port

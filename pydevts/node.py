@@ -8,6 +8,10 @@ from pydevts.p2p import P2PConnection
 # Type hints
 from ssl import SSLContext
 from typing import Callable
+from .auth._base import _Auth
+
+# Authentication
+from .auth.noauth import NoAuth
 
 class _Node:
     """Basic peer to peer node for messaging"""
@@ -15,21 +19,24 @@ class _Node:
     entry_addr: tuple[str, int]
     ssl_context: SSLContext
     on_start: list[Callable[[],None]]
+    auth_method: _Auth
 
-    def __init__(self, entry_addr: tuple[str, int], ssl_context: SSLContext = None):
+    def __init__(self, entry_addr: tuple[str, int], ssl_context: SSLContext = None, auth_method: _Auth = NoAuth()):
         """Basic peer to peer node for messaging
 
         Args:
             entry_addr (tuple[str, int]): The entry node in the cluster
             ssl_context (SSLContext): The ssl context used
+            auth_method (_Auth): The authentication method to be used
         """
 
         # Save these for later
         self.entry_addr = entry_addr
         self.ssl_context = ssl_context
+        self.auth_method = auth_method
 
         # Create the connection
-        self.conn = P2PConnection(ssl_context = self.ssl_context)
+        self.conn = P2PConnection(ssl_context = self.ssl_context, auth_method=auth_method)
 
         # Initialize events
         self.on_start = []

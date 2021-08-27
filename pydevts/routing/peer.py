@@ -61,6 +61,7 @@ class PeerRouter(_Router):
             host_addr (tuple[str, int]): The address that we are hosting on
             tls (bool, optional): Whether to use TLS. Defaults to False.
             verify_key (str, optional): The verify key to use for TLS. Defaults to None.
+            auth_method (_Auth): The authentication method to be used
         """
 
         # Save values passed
