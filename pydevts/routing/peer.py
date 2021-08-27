@@ -40,6 +40,7 @@ class PeerRouter(_Router):
     node_id: str
     peers: dict[str, tuple[str, int]]
     auth_method: _Auth
+    data_handler: Callable[[bytes],None]
 
     def __init__(self, ssl_context: ssl.SSLContext = None):
         """Initialize the router
@@ -48,9 +49,12 @@ class PeerRouter(_Router):
             ssl_context (tuple[str, str], optional): The public-private ssl_context to use for encryption. Defaults to None.
         """
 
+        # Save SSL context
         self.ssl_context = ssl_context
 
+        # Set default values
         self.peers = dict()
+        self.data_handler = None
     
     async def enter(self, host: str, port: int, host_addr: tuple[str, int], tls: bool = False, verify_key: str = None, auth_method: _Auth = AuthNone()):
         """Enters a cluster
@@ -130,7 +134,8 @@ class PeerRouter(_Router):
             data (bytes): The data to emit
         """
 
-        raise NotImplementedError()
+        # Delegate to subfunction
+        await self._emit(b'DATA', data)
 
     
     async def _emit(self, name: str, data: bytes):
@@ -166,7 +171,7 @@ class PeerRouter(_Router):
             datahandler (Callable[[bytes],None]): The data handler
         """
 
-        raise NotImplementedError()
+        self.data_handler = datahandler
 
     async def on_connection(self, connection: _WrappedConnection):
         """Handles a new connection
@@ -200,7 +205,10 @@ class PeerRouter(_Router):
 
                 # Log that a new peer is joining
                 logger.info(f"New peer {data[1][0]}@{data[1][1][0]}:{data[1][1][1]} has joined the cluster")
-
+            elif data[0] == b'DATA':
+                # Handle data
+                if self.data_handler:
+                    self.data_handler(data[1])
         
 
     
