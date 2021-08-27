@@ -32,10 +32,13 @@ import struct
 import ssl
 from ..auth.noauth import AuthNone
 
+# Time
+import time
+
 
 class NodeConnection:
     
-    connections: dict[str, Union[TLSStream, SocketStream]]
+    connections: dict[str, list[Union[TLSStream, SocketStream], int]]
     verify_key: Optional[str]
     auth_method: Optional[_Auth]
 
@@ -106,7 +109,7 @@ class NodeConnection:
             remote_id = str(uuid4())
         
         # Add the connection to the list of connections
-        self.connections[remote_id] = connection
+        self.connections[remote_id] = [connection, time.time()]
 
         # Return the ID
         return remote_id
@@ -160,6 +163,9 @@ class NodeConnection:
 
         # Send the message
         await self.connections[remote_id].send(length + data)
+
+        # Set last update time
+        self.connections[remote_id][1] = time.time()
         
     
     
@@ -190,6 +196,8 @@ class NodeConnection:
         if not isinstance(data, list) or len(data) != 2:
             raise ValueError('Remote host returned invalid data')
 
+        # Set last access time for connection
+        self.connections[data[0]][1] = time.time()
 
         # Return the name and data
         return data
@@ -213,4 +221,20 @@ class NodeConnection:
         # Send the message
         for connection in self.connections.values():
             await connection.send(length + data)
+    
+    async def clean(self: "NodeConnection"):
+        """Cleans all connections that have not been used in the last minute
+
+        Args:
+            self (NodeConnection):
+        """
+
+        remove = []
+        for k, v in self.connections.items():
+            if time.time() - v[1] > 60:
+                remove.append(k)
         
+        for k in remove:
+            await self.disconnect(k)
+        
+
