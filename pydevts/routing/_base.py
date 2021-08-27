@@ -12,7 +12,7 @@ class _Router:
     """A Base class for pydevts routers
     """
 
-    ssl_context: tuple[str, str]
+    ssl_context: ssl.SSLContext
 
     def __init__(self, ssl_context: ssl.SSLContext = None):
         """Initialize the router
@@ -23,13 +23,15 @@ class _Router:
 
         self.ssl_context = ssl_context
     
-    async def enter(self, host: str, port: int, tls: bool = False):
+    async def enter(self, host: str, port: int, host_addr: tuple[str, int], tls: bool = False, verify_key: str = None):
         """Enters a cluster
 
         Args:
             host (str): The entry host of the cluster
             port (int): The entry port of the cluster
+            host_addr (tuple[str, int]): The address that we are hosting on
             tls (bool, optional): Whether to use TLS. Defaults to False.
+            verify_key (str, optional): The verify key to use for TLS. Defaults to None.
         """
 
         raise NotImplementedError()
@@ -44,7 +46,25 @@ class _Router:
 
         raise NotImplementedError()
     
-    async def on_connection(self, connection: _WrappedConnection, datahandler: Callable[[bytes],None]):
+    async def emit(self, data: bytes):
+        """Emits data to all connected nodes
+        
+        Args:
+            data (bytes): The data to emit
+        """
+
+        raise NotImplementedError()
+    
+    async def register_handler(self, datahandler: Callable[[bytes],None]):
+        """Registers the data handler
+        
+        Args:
+            datahandler (Callable[[bytes],None]): The data handler
+        """
+
+        raise NotImplementedError()
+
+    async def on_connection(self, connection: _WrappedConnection):
         """Handles a new connection
         
         Args:
