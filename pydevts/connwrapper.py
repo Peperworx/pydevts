@@ -22,7 +22,7 @@ class _WrappedConnection:
         
         self._connection = connection
 
-        self.addr = connection._raw_socket.getsockname()
+        self.addr = connection._raw_socket.getpeername()
 
     
     async def close(self):

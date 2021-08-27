@@ -78,9 +78,23 @@ class PeerRouter(_Router):
 
             # Await our connection info
             conn_info = await self.connection.recv(self.entry)
+            # Check if we have joined successfully
+            if conn_info[0] != 'JOIN_OK':
+                raise ConnectionError("Failed to join cluster")
+            
+            # If not, set our peer list
+            self.peers = conn_info[1][0]
 
-            print(conn_info)
-        except OSError:
+            # Add our entry node
+            self.peers[conn_info[1][2]] = (host, port)
+
+            # Set our nodeId
+            self.node_id = conn_info[1][1]
+
+            # Log that we have joined
+            logger.info(f"Joined cluster via entry node {conn_info[1][2]}@{host}:{port}")
+
+        except OSError as e:
             logger.warning(f"Unable to connect to cluster at {host}:{port}. Starting new cluster")
             self.node_id = str(uuid.uuid4())
         
@@ -119,15 +133,21 @@ class PeerRouter(_Router):
             name (str): The name of the event
             data (bytes): The data to emit
         """
-
+        remove = []
         # Send to all peers
-        for peer in self.peers.keys():
-            handle = await self.connection.connect(self.peers[peer][0], self.peers[peer][1], self.tls)
-            await self.connection.send(handle, name, data)
-            await self.connection.disconnect(handle)
+        for peer in self.peers.copy().keys():
+            try:
+                handle = await self.connection.connect(self.peers[peer][0], self.peers[peer][1], self.tls)
+                await self.connection.send(handle, name, data)
+                await self.connection.disconnect(handle)
+            except OSError:
+                remove.append(peer)
+        
+        # Remove dead peers
+        for peer in remove:
+            del self.peers[peer]
         
         # Send to self
-        print(self.host_addr)
         handle = await self.connection.connect(*self.host_addr, self.tls)
         await self.connection.send(handle, name, data)
         await self.connection.disconnect(handle)
@@ -157,11 +177,11 @@ class PeerRouter(_Router):
 
                 peerid = str(uuid.uuid4())
                 # If a peer is joining a cluster, then send the peer our list of peers, as well as the peer's new ID
-                await connection.send("JOIN_OK", (self.peers, peerid))
-
+                await connection.send("JOIN_OK", (self.peers, peerid, self.node_id))
+                
                 # Tell all peers that a new peer has joined
                 await self._emit(b'NEW', (peerid, connection.addr))
-
+                
                 # This already sends the new request to self.
             elif data[0] == b'NEW':
                 if data[1][0] in self.peers.keys():
