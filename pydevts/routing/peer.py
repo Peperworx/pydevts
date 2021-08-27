@@ -85,7 +85,7 @@ class PeerRouter(_Router):
             self.entry = await self.connection.connect(host, port, tls)
 
             # Tell entry that we have joined
-            await self.connection.send(self.entry, b'JOIN', (host_addr,))
+            await self.connection.send(self.entry, 'JOIN', (host_addr,))
 
             # Await our connection info
             conn_info = await self.connection.recv(self.entry)
@@ -127,10 +127,10 @@ class PeerRouter(_Router):
         connection = await self.connection.connect(self.peers[node_id][0], self.peers[node_id][1], self.tls)
 
         # Send data
-        await self.connection.send(connection, (self.node_id, data))
+        await self.connection.send(connection, "DATA", (self.node_id, data))
 
         # Clean all connections that have not been used in 60 seconds
-        await connection.clean()
+        await self.connection.clean()
     
     async def emit(self, data: bytes):
         """Emits data to all connected nodes
@@ -140,7 +140,7 @@ class PeerRouter(_Router):
         """
 
         # Delegate to subfunction
-        await self._emit(b'DATA', (self.node_id, data))
+        await self._emit('DATA', (self.node_id, data))
 
     
     async def _emit(self, name: str, data: bytes):
@@ -190,27 +190,28 @@ class PeerRouter(_Router):
             data = await connection.recv()
             
             # Check the first value
-            if data[0] == b'JOIN':
+            if data[0] == 'JOIN':
 
                 peerid = str(uuid.uuid4())
                 # If a peer is joining a cluster, then send the peer our list of peers, as well as the peer's new ID
                 await connection.send("JOIN_OK", (self.peers, peerid, self.node_id))
                 
                 # Tell all peers that a new peer has joined
-                await self._emit(b'NEW', (peerid, connection.addr))
+                await self._emit('NEW', (peerid, connection.addr, data[1][0]))
                 
                 # This already sends the new request to self.
-            elif data[0] == b'NEW':
+            elif data[0] == 'NEW':
                 if data[1][0] in self.peers.keys():
                     # The peer is already in the cluster
                     # Ignore this request
                     continue
-                
-                self.peers[data[1][0]] = data[1][1]
+                host = data[1][1][0]
+                port = data[1][2][1]
+                self.peers[data[1][0]] = (host, port)
 
                 # Log that a new peer is joining
-                logger.info(f"New peer {data[1][0]}@{data[1][1][0]}:{data[1][1][1]} has joined the cluster")
-            elif data[0] == b'DATA':
+                logger.info(f"New peer {data[1][0]}@{data[1][1][0]}:{data[1][2][1]} has joined the cluster")
+            elif data[0] == 'DATA':
                 # Handle data
                 if self.data_handler:
                     await self.data_handler(data[1][0], data[1][1])

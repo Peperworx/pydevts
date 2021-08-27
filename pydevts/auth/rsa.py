@@ -45,8 +45,6 @@ class AuthRSA(_Auth):
             conn (_WrappedConnection): The connection that we are using
         """
 
-        print('RSA')
-
         # Tell the server we are ready
         await conn.send("START_RSA", b"")
 
@@ -81,7 +79,6 @@ class AuthRSA(_Auth):
         Args:
             conn (_WrappedConnection): The connection that we are using
         """
-        print("RSA Server")
         
         # Receive initial message
         msg = await conn.recv()
