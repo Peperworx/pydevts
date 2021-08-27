@@ -22,11 +22,19 @@ auth_method = AuthRSA(pubkey, privkey)
 
 node = _Node(('localhost', port),auth_method=auth_method)
 
+async def on_bcast(nodeid, name, data):
+    print(f"{name}: {data}")
+    await node.send(nodeid, "resp", data)
+
+async def on_resp(nodeid, name, data):
+    print(f"RESP {name}: {data}")
 
 async def on_start():
-    print(node.conn.router.peers)
+    await node.emit("bcast", b"hello, world!")
 
 node.bind_start(on_start)
+node.bind("bcast", on_bcast)
+node.bind("resp", on_resp)
 
 @logger.catch
 async def main():

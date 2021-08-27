@@ -208,7 +208,7 @@ class PeerRouter(_Router):
             elif data[0] == b'DATA':
                 # Handle data
                 if self.data_handler:
-                    self.data_handler(data[1][0], data[1][1])
+                    await self.data_handler(data[1][0], data[1][1])
         
 
     

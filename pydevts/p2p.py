@@ -36,9 +36,8 @@ class P2PConnection:
     router: _Router
     server: NodeHost
     handler: Callable[[_WrappedConnection], None]
+    data_handler: list[Callable[[str, bytes], None]]
     auth_method: _Auth
-    has_data: Condition
-    last_recv: tuple[str, bytes]
 
     def __init__(self, host: str = "0.0.0.0", port: int = 0,
         router: _Router = PeerRouter,
@@ -64,9 +63,8 @@ class P2PConnection:
         # Initialize router
         self.router = router(self.ssl_context)
 
-        # Has data
-        self.has_data = Condition()
-        last_recv = ["",b""]
+        # Data handler
+        self.data_handler = []
     
     async def connect(self, host: str, port: int, usetls: bool = False,
         verify_key: str = None):
@@ -113,14 +111,19 @@ class P2PConnection:
             data (bytes): The data received
         """
 
-        # Lock data received
-        async with self.has_data:
-            # Save data
-            self.last_recv = (self.server.local_host, data)
+        # Delegate to registered handler
+        for handler in self.data_handler:
+            await handler(node, data)
 
-            # Notify
-            self.has_data.notify_all()
+    def register_data_handler(self, handler: Callable[[bytes], None]):
+        """Register a handler for data received
 
+        Args:
+            handler (Callable[[bytes], None]): The handler to register
+        """
+
+        # Set the handler
+        self.data_handler.append(handler)
 
     async def send_to(self, node: str, data: bytes):
         """Send data to node
@@ -133,19 +136,6 @@ class P2PConnection:
         # Delegate to router
         await self.router.send_to(node, data)
     
-    async def recv_from(self) -> tuple[str, bytes]:
-        """Receive data from node
-
-        Returns:
-            tuple[str, bytes]: The node that send the data and the data itself
-        """
-
-        with self.has_data:
-            # Wait for data
-            await self.has_data.wait()
-
-            # Return data
-            return self.last_recv
     
     async def emit(self, data: bytes):
         """Sends data to all nodes in the network
@@ -154,7 +144,8 @@ class P2PConnection:
             data (bytes): The data to send
         """
 
-        raise NotImplementedError("emit not implemented")
+        # Delegate to router
+        await self.router.emit(data)
 
 
         

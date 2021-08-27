@@ -128,7 +128,7 @@ class NodeConnection:
             raise ValueError(f'No connection to "{remote_id}"')
         
         # Close the connection
-        await self.connections[remote_id].aclose()
+        await self.connections[remote_id][0].aclose()
 
         # Remove the connection from the list of connections
         del self.connections[remote_id]
@@ -162,7 +162,7 @@ class NodeConnection:
         length = struct.pack('!I', len(data))
 
         # Send the message
-        await self.connections[remote_id].send(length + data)
+        await self.connections[remote_id][0].send(length + data)
 
         # Set last update time
         self.connections[remote_id][1] = time.time()
@@ -181,13 +181,13 @@ class NodeConnection:
         """
 
         # Receive the length header
-        length = await self.connections[remote_id].receive(struct.calcsize('!I'))
+        length = await self.connections[remote_id][0].receive(struct.calcsize('!I'))
 
         # Unpack length header
         length = struct.unpack('!I', length)[0]
 
         # Receive the data
-        data = await self.connections[remote_id].receive(length)
+        data = await self.connections[remote_id][0].receive(length)
 
         # Unpack data
         data = msgpack.unpackb(data)
