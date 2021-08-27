@@ -1,21 +1,25 @@
-from pydevts.p2p import P2PConnection
+from pydevts.node import _Node
 import ssl
 import anyio
 import sys
 
-context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-context.load_cert_chain("./certs/test.pem", "./certs/test.key")
-
-conn = P2PConnection()
 
 port = 2233
 
 if len(sys.argv) > 1:
     port = int(sys.argv[1])
 
+node = _Node(('localhost', port))
+
+
+async def on_start():
+    print(node.conn.router.peers)
+
+node.bind_start(on_start)
+
+
 async def main():
-    await conn.connect("localhost", port, usetls=False, verify_key="./certs/test.pem")
+    await node.run()
 
-    await conn.run()
-
-anyio.run(main)
+if __name__ == "__main__":
+    anyio.run(main)
