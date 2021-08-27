@@ -5,7 +5,11 @@
 from ..logger import logger
 
 # Type hints
-from typing import Callable, Union
+from typing import Callable, Optional
+from ..auth._base import _Auth
+
+# Errors
+from ..auth import AuthenticationError
 
 # Anyio
 import anyio
@@ -13,6 +17,7 @@ import anyio
 # Encryption
 from anyio.streams.tls import TLSListener
 import ssl
+from ..auth.noauth import AuthNone
 
 # Wrapped connection
 from ..connwrapper import _WrappedConnection
@@ -26,10 +31,11 @@ class NodeHost:
 
     local_host: str
     local_port: int
-    ssl_context: ssl.SSLContext
+    ssl_context: Optional[ssl.SSLContext]
     handler: Callable[[_WrappedConnection], None]
+    auth_method: Optional[_Auth]
 
-    def __init__(self, local_host: str = None, local_port: int = None, ssl_context: ssl.SSLContext = None):
+    def __init__(self, local_host: str = None, local_port: int = None, ssl_context: ssl.SSLContext = None, auth_method: _Auth = AuthNone()):
         """[summary]
 
         Args:
@@ -57,6 +63,9 @@ class NodeHost:
         self.local_port = local_port
         self.ssl_context = ssl_context
 
+        # Set authentication method
+        self.auth_method = auth_method
+
     
     
     async def _listen_handle(self, conn):
@@ -65,10 +74,15 @@ class NodeHost:
         # Wrap the connection
         connection = _WrappedConnection(conn)
 
+        
         try:
+            # Run authentication
+            if self.auth_method:
+                await self.auth_method.accept_handshake(connection)
+
             # Call the handler
             await self.handler(connection)
-        except anyio.EndOfStream:
+        except (anyio.EndOfStream, ConnectionError, AuthenticationError):
             pass
 
         # Close the connection

@@ -18,20 +18,24 @@ from anyio import connect_tcp
 from anyio.streams.tls import TLSStream
 from anyio.abc._sockets import SocketStream
 from typing import Optional, Union
+from ..auth._base import _Auth
 
 # Data serialization
 import msgpack
 import struct
 
-# Encryption
+# Encryption and authentication
 import ssl
+from ..auth.noauth import AuthNone
+
 
 class NodeConnection:
     
     connections: dict[str, Union[TLSStream, SocketStream]]
     verify_key: Optional[str]
+    auth_method: Optional[_Auth]
 
-    def __init__(self: "NodeConnection", verify_key: str = None):
+    def __init__(self: "NodeConnection", verify_key: str = None, auth_method: _Auth = AuthNone()):
         """Message wrapper for handling multiple TCP connections.
 
         Args:
@@ -43,6 +47,9 @@ class NodeConnection:
 
         # Initialize dictionary of connections
         self.connections = dict()
+
+        # Set out authentication method
+        self.auth_method = auth_method
         
     
     async def connect(self: "NodeConnection", remote_host: str, remote_port: int, usetls: bool = False) -> str:
@@ -72,6 +79,10 @@ class NodeConnection:
             # Create a new connection, if using TLS, pass that as well
             connection = await connect_tcp(remote_host, remote_port, tls=usetls)
 
+        # Run authentication
+        if self.auth_method:
+            # Execute handshake
+            await self.auth_method.handshake(connection)
 
         # Generate a new ID for the remote host
         remote_id = str(uuid4())
