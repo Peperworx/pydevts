@@ -120,8 +120,8 @@ class PeerRouter(_Router):
         # Send data
         await self.connection.send(connection, data)
 
-        # Close connection
-        await connection.close()
+        # Clean all connections that have not been used in 60 seconds
+        await connection.clean()
     
     async def emit(self, data: bytes):
         """Emits data to all connected nodes
@@ -146,7 +146,7 @@ class PeerRouter(_Router):
             try:
                 handle = await self.connection.connect(self.peers[peer][0], self.peers[peer][1], self.tls)
                 await self.connection.send(handle, name, data)
-                await self.connection.disconnect(handle)
+                await self.connection.clean() # We use clean instead of disconnect to maintain a cache of connections
             except OSError:
                 remove.append(peer)
         
@@ -157,7 +157,7 @@ class PeerRouter(_Router):
         # Send to self
         handle = await self.connection.connect(*self.host_addr, self.tls)
         await self.connection.send(handle, name, data)
-        await self.connection.disconnect(handle)
+        await self.connection.clean()
     
     async def register_handler(self, datahandler: Callable[[bytes],None]):
         """Registers the data handler
