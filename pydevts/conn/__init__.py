@@ -38,7 +38,7 @@ import time
 
 class NodeConnection:
     
-    connections: dict[str, list[Union[TLSStream, SocketStream], int]]
+    connections: dict[str, list[Union[TLSStream, SocketStream], int, tuple[str, int]]]
     verify_key: Optional[str]
     auth_method: Optional[_Auth]
 
@@ -73,6 +73,13 @@ class NodeConnection:
         Returns:
             str: The locally used ID for the remote host. Used when sending data to the host.
         """
+
+        # Check if the remote host is already connected
+        for k, v in self.connections.items():
+            # If the host and port match
+            if v[2][0] == remote_host and v[2][1] == remote_port:
+                # Return the ID
+                return k
 
         # If we have a verify key, use it for untrusted connections
         if usetls and self.verify_key:
@@ -109,7 +116,7 @@ class NodeConnection:
             remote_id = str(uuid4())
         
         # Add the connection to the list of connections
-        self.connections[remote_id] = [connection, time.time()]
+        self.connections[remote_id] = [connection, time.time(), (remote_host, remote_port)]
 
         # Return the ID
         return remote_id
