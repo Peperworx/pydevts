@@ -100,17 +100,13 @@ class Node:
         await self._node.send(node, name, data)
     
     
-    async def run(self, verify_key: str = None):
+    async def run(self):
         """Run the node
-
-        Args:
-            verify_key (str, optional): This verify key is the path to the private key of a serve which should be used in TLS mode.
-                This will be removed in future versions as we implement our own encryption.
         """
 
         # Create task group
         async with create_task_group() as tg:
-            await tg.start(self._node.run, verify_key)
+            await tg.start(self._node.run)
             
             # Run system events
             for event in self._sys_events["startup"]:

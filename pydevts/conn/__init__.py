@@ -19,7 +19,6 @@ from ..connwrapper import _WrappedConnection
 from anyio import connect_tcp
 
 # Classes for type hints
-from anyio.streams.tls import TLSStream
 from anyio.abc._sockets import SocketStream
 from typing import Optional, Union
 from ..auth._base import _Auth
@@ -29,7 +28,6 @@ import msgpack
 import struct
 
 # Encryption and authentication
-import ssl
 from ..auth.noauth import AuthNone
 
 # Time
@@ -38,21 +36,16 @@ import time
 
 class NodeConnection:
     
-    connections: dict[str, list[Union[TLSStream, SocketStream], int, tuple[str, int]]]
-    verify_key: Optional[str]
+    connections: dict[str, list[SocketStream, int, tuple[str, int]]]
     auth_method: Optional[_Auth]
 
-    def __init__(self: "NodeConnection", verify_key: str = None, auth_method: _Auth = AuthNone()):
+    def __init__(self: "NodeConnection", auth_method: _Auth = AuthNone()):
         """Message wrapper for handling multiple TCP connections.
 
         Args:
             self (NodeConnection): [description]
-            verify_key (str): The key to be used to verify untrusted connections.
             auth_method (_Auth): The authentication method to be used
         """
-
-        # Set verify key
-        self.verify_key = verify_key
 
         # Initialize dictionary of connections
         self.connections = dict()
@@ -61,14 +54,13 @@ class NodeConnection:
         self.auth_method = auth_method
         
     
-    async def connect(self: "NodeConnection", remote_host: str, remote_port: int, usetls: bool = False) -> str:
+    async def connect(self: "NodeConnection", remote_host: str, remote_port: int) -> str:
         """Connect to remote TCP host
 
         Args:
             self (NodeConnection)
             remote_host (str): The host of the target
             remote_port (int): The port of the target
-            usetls (bool, optional): If the connection should use TLS. Defaults to False.
 
         Returns:
             str: The locally used ID for the remote host. Used when sending data to the host.
@@ -81,19 +73,9 @@ class NodeConnection:
                 # Return the ID
                 return k
 
-        # If we have a verify key, use it for untrusted connections
-        if usetls and self.verify_key:
-            # Create ssl context
-            context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-
-            # Load the verify key
-            context.load_verify_locations(cafile=self.verify_key)
-
-            # Create a new connection
-            connection = await connect_tcp(remote_host, remote_port, ssl_context=context)
-        else:
-            # Create a new connection, if using TLS, pass that as well
-            connection = await connect_tcp(remote_host, remote_port, tls=usetls)
+        
+        # Create a new connection
+        connection = await connect_tcp(remote_host, remote_port)
 
         # Run authentication
         if self.auth_method:

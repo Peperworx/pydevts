@@ -7,7 +7,6 @@ import anyio
 from pydevts.p2p import P2PConnection
 
 # Type hints
-from ssl import SSLContext
 from typing import Callable
 from .auth._base import _Auth
 import anyio.abc
@@ -22,29 +21,26 @@ class _Node:
     """Basic peer to peer node for messaging"""
     
     entry_addr: tuple[str, int]
-    ssl_context: SSLContext
     on_start: list[Callable[[],None]]
     auth_method: _Auth
     _events: dict[str, Callable[[bytes], None]]
 
     def __init__(self, entry_addr: tuple[str, int], host_addr: tuple[str, int] = ("0.0.0.0", 0), 
-        ssl_context: SSLContext = None, auth_method: _Auth = AuthNone()):
+        auth_method: _Auth = AuthNone()):
         """Basic peer to peer node for messaging
 
         Args:
             entry_addr (tuple[str, int]): The entry node in the cluster
-            ssl_context (SSLContext): The ssl context used
             auth_method (_Auth): The authentication method to be used
         """
 
         # Save these for later
         self.entry_addr = entry_addr
-        self.ssl_context = ssl_context
         self.auth_method = auth_method
 
         # Create the connection
         self.conn = P2PConnection(host = host_addr[0], port = host_addr[1], 
-            ssl_context = self.ssl_context, auth_method=auth_method)
+            auth_method=auth_method)
 
         # Bind event handlers
         self.conn.register_data_handler(self._on_data)
@@ -53,15 +49,12 @@ class _Node:
         self.on_start = []
         self._events = dict()
     
-    async def run(self, verify_key: str = None, task_status: anyio.abc.TaskStatus = anyio.TASK_STATUS_IGNORED):
+    async def run(self, task_status: anyio.abc.TaskStatus = anyio.TASK_STATUS_IGNORED):
         """Begins running the node
-        
-        Args:
-            verify_key (str): Pass this if you are testing with another non-trusted private key.
         """
     
         # Connect to the entry node
-        await self.conn.connect(*self.entry_addr, self.ssl_context != None, verify_key=verify_key)
+        await self.conn.connect(*self.entry_addr)
         
         # Trigger task status
         task_status.started()

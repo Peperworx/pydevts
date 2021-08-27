@@ -2,7 +2,6 @@
 """
 # Typeh Hints
 from anyio.abc._sockets import SocketStream
-from anyio.streams.tls import TLSStream
 from typing import Union
 
 # Data serialization
@@ -14,7 +13,7 @@ class _WrappedConnection:
     _connection: SocketStream
     addr: tuple[str, int]
 
-    def __init__(self: '_WrappedConnection', connection: Union[SocketStream, TLSStream]):
+    def __init__(self: '_WrappedConnection', connection: Union[SocketStream]):
         """Wraps a socket stream to provide a message based interface
 
         Args:
@@ -24,10 +23,7 @@ class _WrappedConnection:
         
         self._connection = connection
 
-        if isinstance(connection, TLSStream):
-            self.addr = connection.transport_stream._raw_socket.getpeername()
-        else:
-            self.addr = connection._raw_socket.getpeername()
+        self.addr = connection._raw_socket.getpeername()
 
     
     async def close(self):

@@ -5,33 +5,30 @@
 # Type Hints
 from ..connwrapper import _WrappedConnection
 from typing import Callable
-import ssl
+
 
 
 class _Router:
     """A Base class for pydevts routers
     """
 
-    ssl_context: ssl.SSLContext
+    
 
-    def __init__(self, ssl_context: ssl.SSLContext = None):
+    def __init__(self):
         """Initialize the router
 
         Args:
-            ssl_context (tuple[str, str], optional): The public-private ssl_context to use for encryption. Defaults to None.
         """
 
-        self.ssl_context = ssl_context
+        pass
     
-    async def enter(self, host: str, port: int, host_addr: tuple[str, int], tls: bool = False, verify_key: str = None):
+    async def enter(self, host: str, port: int, host_addr: tuple[str, int]):
         """Enters a cluster
 
         Args:
             host (str): The entry host of the cluster
             port (int): The entry port of the cluster
             host_addr (tuple[str, int]): The address that we are hosting on
-            tls (bool, optional): Whether to use TLS. Defaults to False.
-            verify_key (str, optional): The verify key to use for TLS. Defaults to None.
         """
 
         raise NotImplementedError()

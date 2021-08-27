@@ -16,7 +16,6 @@ from ._base import _Router
 from ..connwrapper import _WrappedConnection
 from typing import Callable
 from ..auth._base import _Auth
-import ssl
 
 # Node hosts and connections
 from ..host import NodeHost
@@ -29,12 +28,9 @@ class PeerRouter(_Router):
     """Peer-based routing system
     """
 
-    ssl_context: ssl.SSLContext
     host: str
     port: int
     host_addr: tuple[str, int]
-    tls: bool
-    verify_key: str
     connection: NodeConnection
     entry: str
     node_id: str
@@ -42,47 +38,38 @@ class PeerRouter(_Router):
     auth_method: _Auth
     data_handler: Callable[[str, bytes],None]
 
-    def __init__(self, ssl_context: ssl.SSLContext = None):
+    def __init__(self):
         """Initialize the router
-
-        Args:
-            ssl_context (tuple[str, str], optional): The public-private ssl_context to use for encryption. Defaults to None.
         """
 
-        # Save SSL context
-        self.ssl_context = ssl_context
 
         # Set default values
         self.peers = dict()
         self.data_handler = None
     
-    async def enter(self, host: str, port: int, host_addr: tuple[str, int], tls: bool = False, verify_key: str = None, auth_method: _Auth = AuthNone()):
+    async def enter(self, host: str, port: int, host_addr: tuple[str, int], auth_method: _Auth = AuthNone()):
         """Enters a cluster
 
         Args:
             host (str): The entry host of the cluster
             port (int): The entry port of the cluster
             host_addr (tuple[str, int]): The address that we are hosting on
-            tls (bool, optional): Whether to use TLS. Defaults to False.
-            verify_key (str, optional): The verify key to use for TLS. Defaults to None.
             auth_method (_Auth): The authentication method to be used
         """
 
         # Save values passed
         self.host = host
         self.port = port
-        self.tls = tls
-        self.verify_key = verify_key
         self.host_addr = host_addr
         self.auth_method = auth_method
 
         # Create the connection
-        self.connection = NodeConnection(self.verify_key, auth_method=self.auth_method)
+        self.connection = NodeConnection(auth_method=self.auth_method)
 
         # Wrap with try, except so that we can detect if the connection fails
         try:
             # Connect to the entry node
-            self.entry = await self.connection.connect(host, port, tls)
+            self.entry = await self.connection.connect(host, port)
 
             # Tell entry that we have joined
             await self.connection.send(self.entry, 'JOIN', (host_addr,))
@@ -124,7 +111,7 @@ class PeerRouter(_Router):
             return
 
         # Open connection
-        connection = await self.connection.connect(self.peers[node_id][0], self.peers[node_id][1], self.tls)
+        connection = await self.connection.connect(self.peers[node_id][0], self.peers[node_id][1])
 
         # Send data
         await self.connection.send(connection, "DATA", (self.node_id, data))
@@ -154,7 +141,7 @@ class PeerRouter(_Router):
         # Send to all peers
         for peer in self.peers.copy().keys():
             try:
-                handle = await self.connection.connect(self.peers[peer][0], self.peers[peer][1], self.tls)
+                handle = await self.connection.connect(self.peers[peer][0], self.peers[peer][1])
                 await self.connection.send(handle, name, data)
                 await self.connection.clean() # We use clean instead of disconnect to maintain a cache of connections
             except OSError:
@@ -165,7 +152,7 @@ class PeerRouter(_Router):
             del self.peers[peer]
         
         # Send to self
-        handle = await self.connection.connect(*self.host_addr, self.tls)
+        handle = await self.connection.connect(*self.host_addr)
         await self.connection.send(handle, name, data)
         await self.connection.clean()
     
