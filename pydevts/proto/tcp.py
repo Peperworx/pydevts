@@ -146,13 +146,8 @@ class TCPServer(_Server):
         # Close the connection
         await new_conn.close()
             
-
-    async def run(self, task_status: TaskStatus = TASK_STATUS_IGNORED):
-        """Run the server.
-
-        Args:
-            ONLY PASSED BY ANYIO:
-            task (TaskStatus, optional, anyio): The task status. Defaults to TASK_STATUS_IGNORED.
+    async def initialize(self):
+        """Initialize the server.
         """
 
         # Create listener
@@ -165,8 +160,21 @@ class TCPServer(_Server):
         # Update public port value
         self.port = port
 
+    async def run(self, task_status: TaskStatus = TASK_STATUS_IGNORED):
+        """Run the server.
+
+        Args:
+            ONLY PASSED BY ANYIO:
+            task (TaskStatus, optional, anyio): The task status. Defaults to TASK_STATUS_IGNORED.
+        """
+
+        # Initialize the server if it has not already
+        # been initialized
+        if not self._listener:
+            await self.initialize()        
+
         # Task status ready (return our port)
-        task_status.started(port)
+        task_status.started(self.port)
 
         # Start listening
         await self._listener.serve(self._wrap_handler)

@@ -71,7 +71,7 @@ class PeerRouter(_Router):
         try:
             # Connect to the entry node
             self.entry = await self.connections.connect(*entry_addr)
-
+            
             # Tell the entry node we have joined
             await self.connections.send(
                 self.entry,
@@ -97,7 +97,7 @@ class PeerRouter(_Router):
             self.peers = data[0]
 
             # Save our ID
-            self.node_id = data[1]
+            self.node_id = str(data[1])
 
             # Save the entry node ID in peers
             self.peers[data[2]] = self.entry_addr
@@ -122,7 +122,10 @@ class PeerRouter(_Router):
         
         # If this is ourself, just handle it
         if node_id == self.node_id:
-            await self._on_data(bytes(data), self.host_addr)
+            await self._on_data(MsgNum.dumps(3, msgpack.packb((self.node_id, bytes(data)))), self.host_addr)
+
+            # Return so we do not keep executing code
+            return
 
         # Check if the node is in our peers
         if node_id not in self.peers.keys():
@@ -130,13 +133,13 @@ class PeerRouter(_Router):
             raise NodeNotFound(f"Unable to find node with id {node_id}")
 
         # Serialize the message
-        data = MsgNum.dumps(3, bytes(data))
+        data = MsgNum.dumps(3, msgpack.packb((self.node_id, bytes(data),)))
         
         # Connect to the node
         handle = await self.connections.connect(self.peers[node_id][0], self.peers[node_id][1])
 
         # Send
-        await self.connections.send(handle, msgpack.packb(self.node_id, data))
+        await self.connections.send(handle, data)
 
         # Cleanup
         self.connections.clean()

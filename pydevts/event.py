@@ -84,6 +84,7 @@ class P2PEventSystem(P2PConnection):
 
         # Serialize the data
         send_data = MsgName.dumps(name, data)
+        
 
         # Delegate to the underlying P2PConnection
         await super().send_to(node, send_data)

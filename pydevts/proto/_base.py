@@ -91,7 +91,11 @@ class _Server:
 
         raise NotImplementedError("This is an abstract class")
     
-    
+    async def initialize(self):
+        """Initialize the server.
+        """
+
+        raise NotImplementedError("This is an abstract class")
 
     async def run(self, task: TaskStatus = TASK_STATUS_IGNORED):
         """Run the server.

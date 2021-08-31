@@ -51,8 +51,7 @@ class P2PConnection:
             auth_method (_Auth, optional): The authentication method to use. Defaults to AuthNone().
         """
 
-        # Save host and port
-        self.addr = (host, port)
+        
 
         # Save auth method
         self.auth = auth_method
@@ -62,6 +61,9 @@ class P2PConnection:
 
         # Initialize server
         self.server = protocol[2](host, port, self.router.on_connection)
+
+        # Save host and port
+        self.addr = (host, port)
 
         # Setup data handler
         self.data_handlers = []
@@ -76,6 +78,12 @@ class P2PConnection:
 
         # Save the entry address
         self.entry_addr = (host, port)
+
+        # Initialize the server
+        await self.server.initialize()
+
+        # Update our address
+        self.addr = (self.addr[0], self.server.port)
 
         # Register the data handler
         await self.router.register_data_handler(self._on_data)
