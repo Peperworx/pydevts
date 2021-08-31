@@ -119,7 +119,10 @@ class PeerRouter(_Router):
             node_id (str): The ID of the node to send to
             data (bytes): The data to send
         """
-
+        
+        # If this is ourself, just handle it
+        if node_id == self.node_id:
+            await self._on_data(bytes(data), self.host_addr)
 
         # Check if the node is in our peers
         if node_id not in self.peers.keys():
@@ -127,7 +130,7 @@ class PeerRouter(_Router):
             raise NodeNotFound(f"Unable to find node with id {node_id}")
 
         # Serialize the message
-        data = MsgNum.dumps(3, data)
+        data = MsgNum.dumps(3, bytes(data))
         
         # Connect to the node
         handle = await self.connections.connect(self.peers[node_id][0], self.peers[node_id][1])
@@ -147,8 +150,9 @@ class PeerRouter(_Router):
         
         
         # Serialize message
-        data = MsgNum.dumps(3, msgpack.packb((self.node_id, data)))
+        data = MsgNum.dumps(3, msgpack.packb((self.node_id, bytes(data))))
         
+
         # Emit the message
         await self._emit(data)
 
@@ -171,7 +175,7 @@ class PeerRouter(_Router):
                 handle = await self.connections.connect(self.peers[peer][0], self.peers[peer][1])
 
                 # Send
-                await self.connections.send(handle, data)
+                await self.connections.send(handle, bytes(data))
                 
                 # Clean up connections
                 self.connections.clean()
@@ -212,7 +216,7 @@ class PeerRouter(_Router):
         
         # Unpack type
         data_type, data = MsgNum.loads(data)
-
+        
         # Un Msgpack data
         data = msgpack.unpackb(data)
 

@@ -34,7 +34,7 @@ class P2PConnection:
     server: _Server
 
     handler: Callable[[_Conn], None]
-    data_handler: list[Callable[[str, bytes], None]]
+    data_handlers: list[Callable[[str, bytes], None]]
     auth: _Auth
 
     def __init__(self, host: str = "0.0.0.0",
@@ -64,7 +64,7 @@ class P2PConnection:
         self.server = protocol[2](host, port, self.router.on_connection)
 
         # Setup data handler
-        self.data_handler = []
+        self.data_handlers = []
     
     async def connect(self, host: str, port: int):
         """Connect to cluster
@@ -102,7 +102,7 @@ class P2PConnection:
         """
 
         # Delegate to registered handlers
-        for handler in self.data_handler:
+        for handler in self.data_handlers:
             await handler(node, data)
     
     def register_data_handler(self, handler: Callable[[str, bytes], None]):
@@ -112,7 +112,7 @@ class P2PConnection:
         """
 
         # Set the handler
-        self.data_handler.append(handler)
+        self.data_handlers.append(handler)
         
     async def send_to(self, node: str, data: bytes):
         """Send data to node

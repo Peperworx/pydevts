@@ -3,3 +3,6 @@ class ConnectionNotFound(Exception):
 
 class NodeNotFound(Exception):
     ...
+
+class EventNotFound(Exception):
+    ...
