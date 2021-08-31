@@ -6,6 +6,7 @@
 from ..logger import logger
 
 
+
 # Unique IDs
 import uuid
 
@@ -13,7 +14,7 @@ import uuid
 from ._base import _Router
 
 # Type Hints
-from ..proto import _Client, _Conn, _Server
+from ..proto._base import _Client, _Conn, _Server
 from typing import Callable
 
 # Clients and servers
@@ -26,6 +27,7 @@ import msgpack
 
 # Errors
 from ..err import NodeNotFound
+from anyio import EndOfStream
 
 
 class PeerRouter(_Router):
@@ -85,7 +87,7 @@ class PeerRouter(_Router):
             data_type, data = MsgNum.loads(conn_info)
 
             # Verify that we have joined successfully
-            if data_type != 0:
+            if data_type != 1:
                 raise ConnectionError("Failed to join cluster")
             
             # Unpack data
@@ -104,7 +106,7 @@ class PeerRouter(_Router):
             logger.info(f"Joined cluster via entry node {data[2]}@{self.entry_addr[0]}:{self.entry_addr[1]}")
 
 
-        except OSError as e:
+        except (OSError, EndOfStream) as e:
             logger.warning(f"Unable to connect to cluster at {self.entry_addr[0]}:{self.entry_addr[1]}. Starting new cluster")
             self.node_id = str(uuid.uuid4())
 
@@ -134,7 +136,7 @@ class PeerRouter(_Router):
         await self.connections.send(handle, msgpack.packb(self.node_id, data))
 
         # Cleanup
-        await self.connections.clean()
+        self.connections.clean()
     
     async def emit(self, data: bytes):
         """Emits data to all connected nodes
@@ -142,11 +144,11 @@ class PeerRouter(_Router):
         Args:
             data (bytes): The data to emit
         """
-
+        
         
         # Serialize message
-        data = MsgNum.dumps(3, msgpack.packb(self.node_id, data))
-
+        data = MsgNum.dumps(3, msgpack.packb((self.node_id, data)))
+        
         # Emit the message
         await self._emit(data)
 
@@ -172,7 +174,7 @@ class PeerRouter(_Router):
                 await self.connections.send(handle, data)
                 
                 # Clean up connections
-                await self.connections.clean()
+                self.connections.clean()
             except OSError:
                 # Remove peer
                 remove.append(peer)
@@ -182,7 +184,7 @@ class PeerRouter(_Router):
             del self.peers[peer]
         
         # Handle it ourselves
-        await self._on_data(data)
+        await self._on_data(data, self.host_addr)
 
 
 
@@ -199,14 +201,15 @@ class PeerRouter(_Router):
     
 
 
-    async def _on_data(self, data: bytes, addr: tuple[str, int]):
+    async def _on_data(self, data: bytes, addr: tuple[str, int], conn: _Conn = None):
         """Handles data received
 
         Args:
             data (bytes): The data received
             addr (tuple[str, int]): The address of the sender
+            conn (Optional[_Conn]): The connection to use to send data
         """
-
+        
         # Unpack type
         data_type, data = MsgNum.loads(data)
 
@@ -215,12 +218,16 @@ class PeerRouter(_Router):
 
         # Check the type
         if data_type == 0: # Join
+            
+            # If this is a fake connection, return
+            if not conn:
+                return
 
             # Generate ID for new peer
             peer_id = str(uuid.uuid4())
-
+            
             # Tell the peer our peers, its ID, and our ID
-            await self.connections.send(
+            await conn.send(
                 MsgNum.dumps(
                     1,
                     msgpack.packb(
@@ -256,7 +263,7 @@ class PeerRouter(_Router):
             self.peers[peer_id] = (host, port)
 
             # Log that a new peer is joining
-            logger.info(f"New peer {data[1][0]}@{data[1][1][0]}:{data[1][2][1]} has joined the cluster")
+            logger.info(f"New peer {data[0]}@{data[1][0]}:{data[2][1]} has joined the cluster")
         elif data_type == 3: # Data
             
             # Call the data handler
@@ -275,6 +282,6 @@ class PeerRouter(_Router):
             data = await connection.recv()
 
             # Handle data
-            await self._on_data(data, connection.addr)
+            await self._on_data(data, connection.addr, connection)
 
             

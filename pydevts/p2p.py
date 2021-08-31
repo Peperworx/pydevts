@@ -1,6 +1,12 @@
 """Implements system for MultiPeer P2P Connections
 """
 
+# Logging
+from .logger import logger
+
+# Anyio
+from anyio import create_task_group
+
 # Routers
 from .routing import PeerRouter
 
@@ -80,12 +86,13 @@ class P2PConnection:
             self.addr
         )
     
-    async def run(self):
+    async def run(self, *args, **kwargs):
         """Start running the server
         """
-
-        # Start the server
-        await self.server.run()
+        
+        # Delegate to the server
+        await self.server.run(*args, **kwargs)
+        
         
     async def _on_data(self, node: str, data: bytes):
         """Handle data received

@@ -71,7 +71,7 @@ class MultiClientCache:
                 return key
         
         # Create the connection
-        connection = await self._proto.connect(host, port)
+        connection = await self._proto[0].connect(host, port)
 
         # Add the connection to the cache
         self._cache[connection_id] = [connection, time.time(), (host, port)]
