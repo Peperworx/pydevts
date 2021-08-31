@@ -1,42 +1,34 @@
 import anyio
-from pydevts.event import P2PEventSystem
+from pydevts.pub import Node
 import sys
 
 
 port = sys.argv[1]
 
 
-evt = P2PEventSystem()
+app = Node()
 
-async def test_bcast(node, data):
-    print(f"Received broadcast data from {node}: b'{str(data)}'")
-    await evt.send_to(node, "test_response", data)
+@app.on('test_bcast')
+async def test_bcast(node: str, data: bytes):
 
-async def test_response(node, data):
-    print(f"Received response data from {node}: b'{str(data)}'")
+    print(f"Received broadcast from {node} with data b'{str(data)}'")
 
+    await app.send(node, 'test_resp', data)
 
-evt.register_event_handler("test_bcast", test_bcast)
-evt.register_event_handler("test_response", test_response)
+@app.on('test_resp')
+async def test_resp(node: str, data: bytes):
+    print(f"Received response from {node} with data b'{str(data)}'")
 
-async def on_start():
-    print(evt.server.port)
-    await evt.emit('test_bcast', b'Hello World!')
-
-async def data_handler(node: str, data: bytes):
-    print(f"Received b'{str(data)}' from {node}")
+@app.on_sys('startup')
+async def startup():
+    print("Started")
+    await app.emit("test_bcast", b"Hello, World!")
 
 async def main():
-
     # Connect to the server
-    await evt.connect('127.0.0.1', port)
+    await app.connect('127.0.0.1', port)
 
-    # Create task group
-    async with anyio.create_task_group() as tg:
-        # Start the server
-        await tg.start(evt.run)
-
-        # Start the on_start function
-        tg.start_soon(on_start)
+    # Run the node
+    await app.run()
     
 anyio.run(main)

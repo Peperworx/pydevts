@@ -11,6 +11,8 @@ class _Router:
         A base class for pydevts routers
     """
 
+    node_id: str # The ID of the node
+
     def __init__(self, protocol: tuple[_Client, _Conn, _Server]):
         """Initialize the router
         """
