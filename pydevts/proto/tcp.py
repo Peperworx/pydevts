@@ -117,7 +117,7 @@ class TCPServer(_Server):
         self.port = port
 
         # Save handler
-        self._handler = handler
+        self.handler = handler
     
     async def _wrap_handler(self, conn: SocketStream):
         """The connection handler
@@ -132,7 +132,7 @@ class TCPServer(_Server):
         # Try-except for disconnect
         try:
             # Run the handler
-            await self._handler(new_conn)
+            await self.handler(new_conn)
         except (EndOfStream):
             # Connection closed
             return

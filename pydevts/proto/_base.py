@@ -13,7 +13,7 @@ class _Conn:
     """
 
     def __init__(self):
-        """Initialie the connection
+        """Initialize the connection
         """
 
         raise NotImplementedError("This is an abstract class")
@@ -59,7 +59,7 @@ class _Client(_Conn):
         raise NotImplementedError("This is an abstract class")
     
     @classmethod
-    async def connect(self, host: str, port: int) -> None:
+    async def connect(cls, host: str, port: int) -> None:
         """Connect to a remote server.
 
         Args:
@@ -75,6 +75,7 @@ class _Server:
     """
 
     port: int # The public port of the server
+    handler: Callable[[_Conn], None] # The data handler
 
     def __init__(self, host: str, port: int, handler: Callable[[_Conn], None]):
         """[summary]
@@ -87,6 +88,8 @@ class _Server:
 
         raise NotImplementedError("This is an abstract class")
     
+    
+
     async def run(self, task: TaskStatus = TASK_STATUS_IGNORED):
         """Run the server.
 
