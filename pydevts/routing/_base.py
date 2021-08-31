@@ -4,14 +4,14 @@
 
 # Type hints
 from typing import Callable
-from ..proto._base import _Conn
+from ..proto._base import _Client, _Conn, _Server
 
 class _Router:
     """
         A base class for pydevts routers
     """
 
-    def __init__(self):
+    def __init__(self, protocol: tuple[_Client, _Conn, _Server]):
         """Initialize the router
         """
 
@@ -46,7 +46,7 @@ class _Router:
 
         raise NotImplementedError("This is an abstract class")
     
-    async def register_data_handler(self, data_handler: Callable[[bytes],None]):
+    async def register_data_handler(self, data_handler: Callable[[str, bytes],None]):
         """Registers the data handler
         
         Args:

@@ -5,7 +5,7 @@
 # Type hints
 from ..proto._base import _Conn
 
-class _Auth:
+class AuthNone:
     """
         Base class for authentication formats
     """

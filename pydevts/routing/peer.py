@@ -19,8 +19,6 @@ from typing import Callable
 # Clients and servers
 from ..conn import MultiClientCache
 
-# TCP server is default
-from ..proto import TCPProto
 
 # Serialization
 from ..msg import MsgNum
@@ -43,7 +41,7 @@ class PeerRouter(_Router):
     node_id: str
 
 
-    def __init__(self, protocol: tuple[_Client, _Conn, _Server] = TCPProto):
+    def __init__(self, protocol: tuple[_Client, _Conn, _Server]):
         """Initialize the router
         """
 
@@ -133,7 +131,7 @@ class PeerRouter(_Router):
         handle = await self.connections.connect(self.peers[node_id][0], self.peers[node_id][1])
 
         # Send
-        await self.connections.send(handle, data)
+        await self.connections.send(handle, msgpack.packb(self.node_id, data))
 
         # Cleanup
         await self.connections.clean()
@@ -147,7 +145,7 @@ class PeerRouter(_Router):
 
         
         # Serialize message
-        data = MsgNum.dumps(3, data)
+        data = MsgNum.dumps(3, msgpack.packb(self.node_id, data))
 
         # Emit the message
         await self._emit(data)
@@ -189,7 +187,7 @@ class PeerRouter(_Router):
 
 
 
-    async def register_data_handler(self, data_handler: Callable[[bytes],None]):
+    async def register_data_handler(self, data_handler: Callable[[str, bytes],None]):
         """Registers the data handler
         
         Args:
@@ -259,6 +257,10 @@ class PeerRouter(_Router):
 
             # Log that a new peer is joining
             logger.info(f"New peer {data[1][0]}@{data[1][1][0]}:{data[1][2][1]} has joined the cluster")
+        elif data_type == 3: # Data
+            
+            # Call the data handler
+            await self.data_handler(data[0], data[1])
 
 
     async def on_connection(self, connection: _Conn):
