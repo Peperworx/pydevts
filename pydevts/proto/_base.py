@@ -12,6 +12,9 @@ class _Conn:
     """Base class for connection classes.
     """
 
+    # The address on the other end of the pipe
+    addr: tuple[str, int]
+
     def __init__(self):
         """Initialize the connection
         """

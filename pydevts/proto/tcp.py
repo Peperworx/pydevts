@@ -24,6 +24,9 @@ class TCPConn(_Conn):
 
     _wraps: SocketStream
 
+    # The address on the other end of the pipe
+    addr: tuple[str, int]
+
     def __init__(self, wraps: SocketStream):
         """Initialize the wrapper class
 
@@ -33,6 +36,9 @@ class TCPConn(_Conn):
 
         # Save the wrapped object
         self._wraps = wraps
+
+        # Save the address
+        self.addr = self._wraps._raw_socket.getpeername()
     
     async def recv(self, max_bytes: int = 35536) -> bytes:
         """Receive data overthe connection.

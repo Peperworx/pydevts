@@ -26,6 +26,9 @@ from ..proto import TCPProto
 from ..msg import MsgNum
 import msgpack
 
+# Errors
+from ..err import NodeNotFound
+
 
 class PeerRouter(_Router):
     """Peer-based routing system
@@ -117,7 +120,23 @@ class PeerRouter(_Router):
             data (bytes): The data to send
         """
 
-        raise NotImplementedError("This is an abstract class")
+
+        # Check if the node is in our peers
+        if node_id not in self.peers.keys():
+            # If not, raise error
+            raise NodeNotFound(f"Unable to find node with id {node_id}")
+
+        # Serialize the message
+        data = MsgNum.dumps(3, data)
+        
+        # Connect to the node
+        handle = await self.connections.connect(self.peers[node_id][0], self.peers[node_id][1])
+
+        # Send
+        await self.connections.send(handle, data)
+
+        # Cleanup
+        await self.connections.clean()
     
     async def emit(self, data: bytes):
         """Emits data to all connected nodes
@@ -126,11 +145,15 @@ class PeerRouter(_Router):
             data (bytes): The data to emit
         """
 
-        raise NotImplementedError("This is an abstract class")
-    
+        
+        # Serialize message
+        data = MsgNum.dumps(3, data)
+
+        # Emit the message
+        await self._emit(data)
 
 
-    
+
     async def _emit(self, data: bytes) -> None:
         """Internal function to emit data to all connected nodes
 
@@ -178,15 +201,19 @@ class PeerRouter(_Router):
     
 
 
-    async def _on_data(self, data: bytes):
+    async def _on_data(self, data: bytes, addr: tuple[str, int]):
         """Handles data received
 
         Args:
             data (bytes): The data received
+            addr (tuple[str, int]): The address of the sender
         """
 
         # Unpack type
         data_type, data = MsgNum.loads(data)
+
+        # Un Msgpack data
+        data = msgpack.unpackb(data)
 
         # Check the type
         if data_type == 0: # Join
@@ -208,6 +235,31 @@ class PeerRouter(_Router):
                 )
             )
 
+            # Tell all peers that a new peer has joined
+            await self._emit(MsgNum.dumps(
+                2,
+                msgpack.packb((peer_id, addr, data[0]))
+            ))
+        elif data_type == 2: # New node
+
+            # If the peer is already in the cluster
+            if data[0] in self.peers.keys():
+                # Ignore
+                return
+            
+            # Extract the host and port
+            host = data[1][0]
+            port = data[2][1]
+
+            # And the ID
+            peer_id = data[0]
+
+            # Add the peer
+            self.peers[peer_id] = (host, port)
+
+            # Log that a new peer is joining
+            logger.info(f"New peer {data[1][0]}@{data[1][1][0]}:{data[1][2][1]} has joined the cluster")
+
 
     async def on_connection(self, connection: _Conn):
         """Handles a new connection
@@ -221,6 +273,6 @@ class PeerRouter(_Router):
             data = await connection.recv()
 
             # Handle data
-            await self._on_data(data)
+            await self._on_data(data, connection.addr)
 
             
