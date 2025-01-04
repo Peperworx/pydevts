@@ -1,153 +1,142 @@
-import uuid
-from anyio.streams.stapled import MultiListener
-from anyio.abc._sockets import SocketStream
-import anyio
-from loguru import logger
-from .conn import Connection
-from .routers.hopbased import HopBasedRouter
-from . import errors
-import msgpack
-from types import FunctionType
+"""Implements system for MultiPeer P2P Connections
+"""
 
-class P2PNode:
-    """
-        A basic peer to peer node.
+# Logging
+from .logger import logger
+
+# Anyio
+from anyio import create_task_group
+
+# Routers
+from .routing import PeerRouter
+
+# Type hints
+from .proto._base import _Conn, _Client, _Server
+from .routing._base import _Router
+from typing import Callable
+from .auth._base import _Auth
+
+# Default server is TCP
+from .proto import TCPProto
+
+# Default authentication is no auth
+from .auth import AuthNone
+
+class P2PConnection:
+    """Multipeer P2P communications
     """
 
+    addr: tuple[str, int]
+    entry_addr: tuple[str, int]
+
+    router: _Router
+
+    server: _Server
+
+    handler: Callable[[_Conn], None]
+    data_handlers: list[Callable[[str, bytes], None]]
+    auth: _Auth
+
+    def __init__(self, host: str = "0.0.0.0",
+        port: int = 0,
+        router: _Router = PeerRouter,
+        protocol: tuple[_Client, _Conn, _Server] = TCPProto,
+        auth_method: _Auth = AuthNone()):
+        """Initialize P2PConnection
+
+        Args:
+            host (str, optional): The host to listen on. Defaults to "0.0.0.0".
+            port (int, optional): The port to listen on. Defaults to 0.
+            router (_Router, optional): The router to use. Defaults to PeerRouter.
+            auth_method (_Auth, optional): The authentication method to use. Defaults to AuthNone().
+        """
+
+        
+
+        # Save auth method
+        self.auth = auth_method
+
+        # Initialize router
+        self.router = router(protocol)
+
+        # Initialize server
+        self.server = protocol[2](host, port, self.router.on_connection)
+
+        # Save host and port
+        self.addr = (host, port)
+
+        # Setup data handler
+        self.data_handlers = []
     
-    nid: str # The node ID of this node
-    server: MultiListener # The anyio server listener
-    listen_port: int # The port to listen on
-    router: HopBasedRouter
-    callbacks: dict[str, list[FunctionType]]
-    entry: dict # The entry node
+    async def connect(self, host: str, port: int):
+        """Connect to cluster
 
-    def __init__(self):
-        """
-            A basic multi peer peer to peer node.
-        """
-        self.nid = str(uuid.uuid4())
-        self.router = HopBasedRouter(self)
-        self.callbacks = {}
-
-    async def join(self,host: str,port: int):
-        """
-            Join a cluster.
+        Args:
+            host (str): The host to connect to.
+            port (int): The port to connect to.
         """
 
-        # Initialize local server
-        await self._initialize()
+        # Save the entry address
+        self.entry_addr = (host, port)
 
+        # Initialize the server
+        await self.server.initialize()
 
-        entry = (await self.router.connect_to(host, port))
+        # Update our address
+        self.addr = (self.addr[0], self.server.port)
 
-        if entry == None:
-            logger.info(f'Unable to connect to network through node {host}:{port}. Creating network')
-            await self.run()
-            return
+        # Register the data handler
+        await self.router.register_data_handler(self._on_data)
 
-        self.entry = entry
-        logger.info(f'Connected to network through entry node {entry[0]}@{entry[1]}:{entry[2]}')
-
-        await self.run()
-
-
-    async def start(self):
-        """
-            Start a cluster
-        """
-
-        # Initialize local server
-        await self._initialize()
-
-        # That is all we need to do to start an empty cluster! Cool!
-
-
-    async def _initialize(self):
-        """
-            Internal function to initialize peer to peer functionalities.
-            Sets up a local server.
-        """
-
-        # Create listeners
-        self.server = await anyio.create_tcp_listener(
-            local_host="0.0.0.0", # All Ips
-            local_port=0 # Choose a port
+        # Tell the router to enter the network
+        await self.router.enter(
+            self.entry_addr,
+            self.addr
         )
-
-        # Our listen port
-        self.listen_port = self.server.listeners[0]._raw_socket.getsockname()[1]
-
-
-        # Log
-        logger.info(f"Created listener at host 0.0.0.0:{self.listen_port}")
-
-    async def send(self, target: str, name: str, data: dict) -> Connection:
-        """
-            Sends an event to a specific target
-        """
-        conn = await self.router.send(target, msgpack.dumps({
-            "name":name,
-            "data":data
-        }))
-        return conn
     
-    async def emit(self, name: str, data: dict):
+    async def run(self, *args, **kwargs):
+        """Start running the server
         """
-            Broadcasts an event to the entire network.
-        """
-
-        await self.router.emit(msgpack.dumps({
-            "name": name,
-            "data": data
-        }))
-
-    def on(self, name: str, func: FunctionType):
-        """
-            Registers callback for event
-        """
-        if name not in self.callbacks.keys():
-            self.callbacks[name] = []
-        self.callbacks[name] += [func]
-
-    async def run(self):
-        """
-            Begin executing server.
-        """
-
-        # Start serving
-        await self.server.serve(self._serve)
-
-    @errors.catch_all_continue
-    async def _serve(self, ss: SocketStream):
-        """
-            Handler called on each request
-        """
-
-        # Wrap the connection
-        conn = Connection(ss)
-
         
-
-        logger.debug(f"Connection from {conn.host}:{conn.port}")
-
-        try:
-            # Loop until we fail
-            while True:
-                
-                data = await self.router.receive(conn)
-                
-                if data["type"] in ["node_join","new_node"]:
-                    dat = data["data"]
-                    logger.info(f'Node {dat[0]}@{dat[2]}:{dat[3]} has joined via node {dat[3]}')
-                elif data["type"] == "data":
-
-                    dat = msgpack.loads(data["body"])
-                    print(dat)
-                    if dat["name"] in self.callbacks.keys():
-                        for v in self.callbacks[dat["name"]]:
-                            await v(conn,dat["data"])
-        except anyio.EndOfStream:
-            # Ignore EndOfStream
-            logger.debug(f"{conn.host}:{conn.port} disconnected")
+        # Delegate to the server
+        await self.server.run(*args, **kwargs)
         
+        
+    async def _on_data(self, node: str, data: bytes):
+        """Handle data received
+
+        Args:
+            data (bytes): The data received.
+        """
+
+        # Delegate to registered handlers
+        for handler in self.data_handlers:
+            await handler(node, data)
+    
+    def register_data_handler(self, handler: Callable[[str, bytes], None]):
+        """Register a handler for data received
+        Args:
+            handler (Callable[[bytes], None]): The handler to register
+        """
+
+        # Set the handler
+        self.data_handlers.append(handler)
+        
+    async def send_to(self, node: str, data: bytes):
+        """Send data to node
+        Args:
+            node (str): The node to send data to
+            data (bytes): The data to send
+        """
+
+        # Delegate to router
+        await self.router.send_to(node, data)
+    
+    async def emit(self, data: bytes):
+        """Sends data to all nodes in the network
+        Args:
+            data (bytes): The data to send
+        """
+
+        # Delegate to router
+        await self.router.emit(data)
